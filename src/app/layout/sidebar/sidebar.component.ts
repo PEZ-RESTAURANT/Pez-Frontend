@@ -112,6 +112,18 @@ import { PERMISSIONS } from '../../core/config/permissions';
         </a>
 
         <a
+          *hasPermission="PERMISSIONS.CATALOG.EDIT_KITCHEN_ZONES"
+          routerLink="/app/admin/kitchen-zones"
+          routerLinkActive="bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 font-semibold"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer text-gray-700 dark:text-gray-300"
+        >
+          <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+          <span>Zonas de Cocina</span>
+        </a>
+
+        <a
           *hasPermission="PERMISSIONS.LOYALTY.VIEW"
           routerLink="/app/loyalty"
           routerLinkActive="bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 font-semibold"

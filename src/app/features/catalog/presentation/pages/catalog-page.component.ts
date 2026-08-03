@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CatalogApi, Category, Product, Supply, RecipeItem } from '../../infrastructure/api/catalog.api';
+import { KitchenApi, KitchenZone } from '../../../kitchen/infrastructure/api/kitchen.api';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 
@@ -242,6 +243,20 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                         >
                           @for (cat of categories(); track cat.id) {
                             <option [value]="cat.id">{{ cat.name }}</option>
+                          }
+                        </select>
+                      </div>
+
+                      <div>
+                        <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Estación de Cocina</label>
+                        <select 
+                          [(ngModel)]="productEditForm.kitchenZoneId"
+                          name="prodKitchenZone"
+                          class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option [ngValue]="null">Cola General (Sin Estación)</option>
+                          @for (zone of kitchenZones(); track zone.id) {
+                            <option [value]="zone.id">{{ zone.name }}</option>
                           }
                         </select>
                       </div>
@@ -840,6 +855,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
 })
 export class CatalogPageComponent implements OnInit {
   private api = inject(CatalogApi);
+  private kitchenApi = inject(KitchenApi);
   private notify = inject(NotificationService);
 
   public activeTab = signal<'products' | 'supplies' | 'recipes'>('products');
@@ -849,6 +865,7 @@ export class CatalogPageComponent implements OnInit {
   public products = signal<Product[]>([]);
   public supplies = signal<Supply[]>([]);
   public recipeItems = signal<RecipeItem[]>([]);
+  public kitchenZones = signal<KitchenZone[]>([]);
 
   // Filter & Search states
   public selectedCategoryFilterId = signal<number | null>(null);
@@ -862,7 +879,7 @@ export class CatalogPageComponent implements OnInit {
   // Forms inputs state
   public categoryForm = { id: 0, name: '' };
   public productCreateForm = { name: '', price: 0, categoryId: null as number | null };
-  public productEditForm = { name: '', price: 0, categoryId: 0, estimatedPrepTimeMinutes: null as number | null, active: true };
+  public productEditForm = { name: '', price: 0, categoryId: 0, estimatedPrepTimeMinutes: null as number | null, active: true, kitchenZoneId: null as number | null };
   public supplyForm = { id: 0, name: '', unit: '', minThreshold: 0 };
   public recipeForm = { supplyId: null as number | null, quantityUsed: 0 };
   public inventoryQtyInput: number = 0;
@@ -902,6 +919,7 @@ export class CatalogPageComponent implements OnInit {
     this.loadCategories();
     this.loadProducts();
     this.loadSupplies();
+    this.loadKitchenZones();
   }
 
   setTab(tab: 'products' | 'supplies' | 'recipes'): void {
@@ -913,6 +931,13 @@ export class CatalogPageComponent implements OnInit {
   }
 
   // --- LOADER HELPER METHODS ---
+  loadKitchenZones(): void {
+    this.kitchenApi.getZones().subscribe({
+      next: (zs) => this.kitchenZones.set(zs),
+      error: () => this.notify.error('Error al cargar las zonas de cocina.')
+    });
+  }
+
   loadCategories(): void {
     this.api.getCategories().subscribe({
       next: (cats) => this.categories.set(cats),
@@ -1027,8 +1052,17 @@ export class CatalogPageComponent implements OnInit {
       price: prod.price,
       categoryId: prod.category ? prod.category.id : 0,
       estimatedPrepTimeMinutes: prod.estimatedPrepTimeMinutes || null,
-      active: prod.active
+      active: prod.active,
+      kitchenZoneId: null
     };
+
+    this.api.getProductKitchenZone(prod.id).subscribe({
+      next: (res) => {
+        if (this.selectedProduct()?.id === prod.id) {
+          this.productEditForm.kitchenZoneId = res.zoneId || null;
+        }
+      }
+    });
   }
 
   openProductCreateModal(): void {
@@ -1067,7 +1101,7 @@ export class CatalogPageComponent implements OnInit {
     const prod = this.selectedProduct();
     if (!prod) return;
 
-    const { name, price, categoryId, estimatedPrepTimeMinutes, active } = this.productEditForm;
+    const { name, price, categoryId, estimatedPrepTimeMinutes, active, kitchenZoneId } = this.productEditForm;
 
     if (!name.trim() || price <= 0 || !categoryId) {
       this.notify.error('Completa todos los campos correctamente.');
@@ -1083,8 +1117,16 @@ export class CatalogPageComponent implements OnInit {
       active
     ).subscribe({
       next: () => {
-        this.notify.success('Producto actualizado.');
-        this.loadProducts();
+        this.api.assignProductKitchenZone(prod.id, kitchenZoneId).subscribe({
+          next: () => {
+            this.notify.success('Producto y zona de cocina actualizados.');
+            this.loadProducts();
+          },
+          error: () => {
+            this.notify.info('Se actualizó el producto, pero falló la asignación de zona.');
+            this.loadProducts();
+          }
+        });
       },
       error: () => this.notify.error('Error al actualizar el producto.')
     });

@@ -6,12 +6,11 @@ import { OrdersService } from '../../infrastructure/services/orders.service';
 import { OrdersApi } from '../../infrastructure/api/orders.api';
 import { RestaurantTable } from '../../domain/models/orders.model';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 
 @Component({
   selector: 'app-layout-editor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, DragDropModule],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
 

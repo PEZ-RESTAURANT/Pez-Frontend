@@ -89,6 +89,12 @@ export const routes: Routes = [
         data: { permission: PERMISSIONS.ORDERS.EDIT_LAYOUT }
       },
       {
+        path: 'admin/kitchen-zones',
+        loadComponent: () => import('./features/kitchen/presentation/pages/kitchen-zones-page.component').then(m => m.KitchenZonesPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.CATALOG.EDIT_KITCHEN_ZONES }
+      },
+      {
         path: 'loyalty',
         loadComponent: () => import('./features/loyalty/presentation/pages/loyalty-page.component').then(m => m.LoyaltyPageComponent),
         canActivate: [permissionGuard],

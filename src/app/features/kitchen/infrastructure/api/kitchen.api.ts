@@ -26,6 +26,18 @@ export class KitchenApi extends BaseApiService {
     return this.http.get<KitchenZone[]>(`${this.baseUrl}/kitchen/zones`);
   }
 
+  createZone(name: string): Observable<KitchenZone> {
+    return this.http.post<KitchenZone>(`${this.baseUrl}/kitchen/zones`, { name });
+  }
+
+  updateZone(id: number, name: string): Observable<KitchenZone> {
+    return this.http.put<KitchenZone>(`${this.baseUrl}/kitchen/zones/${id}`, { name });
+  }
+
+  deleteZone(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/kitchen/zones/${id}`);
+  }
+
   getQueueByZone(zoneId: number): Observable<KitchenQueueItem[]> {
     return this.http.get<KitchenQueueItem[]>(`${this.baseUrl}/kitchen/zones/${zoneId}/queue`);
   }

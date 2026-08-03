@@ -84,6 +84,14 @@ export class CatalogApi extends BaseApiService {
     return this.http.delete<void>(`${this.baseUrl}/products/${id}`);
   }
 
+  getProductKitchenZone(productId: number): Observable<{ zoneId?: number }> {
+    return this.http.get<{ zoneId?: number }>(`${this.baseUrl}/products/${productId}/kitchen-zone`);
+  }
+
+  assignProductKitchenZone(productId: number, zoneId: number | null): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/products/${productId}/kitchen-zone`, { zoneId });
+  }
+
   // --- SUPPLIES ---
   getSupplies(): Observable<Supply[]> {
     return this.http.get<Supply[]>(`${this.baseUrl}/supplies`);
