@@ -41,10 +41,20 @@ export interface Order {
 
 export interface RestaurantTable {
   id: number;
-  tableNumber: string;
-  capacity: number;
+  number: number;
+  floor: number;
+  zoneTag: string;
+  positionX: number;
+  positionY: number;
   status: string;
-  posX: number;
-  posY: number;
-  zoneId?: number;
+  anchorTableId?: number;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  price: number;
+  category: string;
+  estimatedPrepTimeMinutes: number;
+  active: boolean;
 }

@@ -47,6 +47,12 @@ export const routes: Routes = [
         data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
       },
       {
+        path: 'orders/:tableId',
+        loadComponent: () => import('./features/orders/presentation/pages/order-detail-page.component').then(m => m.OrderDetailPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
+      },
+      {
         path: 'kitchen',
         loadComponent: () => import('./features/kitchen/presentation/pages/kitchen-page.component').then(m => m.KitchenPageComponent),
         canActivate: [permissionGuard],
@@ -75,6 +81,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/catalog/presentation/pages/catalog-page.component').then(m => m.CatalogPageComponent),
         canActivate: [permissionGuard],
         data: { permission: PERMISSIONS.CATALOG.EDIT_PRODUCTS_CATEGORIES }
+      },
+      {
+        path: 'admin/layout',
+        loadComponent: () => import('./features/orders/presentation/pages/layout-editor-page.component').then(m => m.LayoutEditorPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.ORDERS.EDIT_LAYOUT }
       },
       {
         path: 'loyalty',

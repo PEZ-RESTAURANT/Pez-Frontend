@@ -42,6 +42,28 @@ export class SessionService {
     return localStorage.getItem(this.TOKEN_KEY);
   }
 
+  getRestaurantId(): number | null {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.restaurantId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  getCurrentUserId(): number | null {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.sub ? parseInt(payload.sub, 10) : null;
+    } catch {
+      return null;
+    }
+  }
+
   private restoreSession(): void {
     const token = this.getToken();
     const userJson = localStorage.getItem(this.USER_KEY);
