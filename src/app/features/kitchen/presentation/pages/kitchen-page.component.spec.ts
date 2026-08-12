@@ -16,7 +16,7 @@ describe('KitchenPageComponent - Urgency Chromatic Levels', () => {
     id: 201,
     name: 'Ceviche Mixto',
     price: 38.0,
-    category: 'MARINA',
+    category: { id: 1, name: 'MARINA' },
     estimatedPrepTimeMinutes: 10, // 10 minutos
     active: true
   };
@@ -25,7 +25,7 @@ describe('KitchenPageComponent - Urgency Chromatic Levels', () => {
     id: 202,
     name: 'Inca Kola 1L',
     price: 10.0,
-    category: 'BEBIDAS',
+    category: { id: 2, name: 'BEBIDAS' },
     estimatedPrepTimeMinutes: 0, // No definido / 0
     active: true
   };

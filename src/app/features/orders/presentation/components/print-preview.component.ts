@@ -1,6 +1,7 @@
 import { Component, Input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Order, Product } from '../../domain/models/orders.model';
+import { Sale } from '../../../cashregister/infrastructure/api/cashregister.api';
 
 @Component({
   selector: 'app-print-preview',
@@ -27,18 +28,34 @@ import { Order, Product } from '../../domain/models/orders.model';
           </div>
         } @else {
           <div class="font-black text-sm uppercase my-1">
-            BOLETA DE VENTA ELECTRÓNICA
+            {{ sale?.documentType === 'FACTURA_ELECTRONICA' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA' }}
           </div>
-          <p class="text-[10px] font-bold">B001-0000{{ order?.id }}</p>
+          <p class="text-[10px] font-bold">
+            {{ sale?.documentType === 'FACTURA_ELECTRONICA' ? 'F001' : 'B001' }}-0000{{ order?.id }}
+          </p>
         }
       </div>
 
       <!-- DATOS DE LA COMANDA -->
       <div class="space-y-1 mb-4 text-[11px]">
         <p><span class="font-bold">Mesa:</span> M{{ tableNumber }}</p>
-        <p><span class="font-bold">Fecha:</span> {{ order?.createdAt | date:'dd/MM/yyyy HH:mm' }}</p>
+        <p><span class="font-bold">Fecha:</span> {{ (sale?.createdAt || order?.createdAt) | date:'dd/MM/yyyy HH:mm' }}</p>
         <p><span class="font-bold">Comanda:</span> #{{ order?.id }}</p>
-        <p *ngIf="order?.customerId"><span class="font-bold">Cliente ID:</span> {{ order?.customerId }}</p>
+        @if (mode === 'venta' && sale) {
+          @if (sale.customerDocumentNumber) {
+            <p>
+              <span class="font-bold">
+                {{ sale.documentType === 'FACTURA_ELECTRONICA' ? 'R.U.C.:' : 'D.N.I./R.U.C.:' }}
+              </span> 
+              {{ sale.customerDocumentNumber }}
+            </p>
+          }
+          @if (sale.customerName) {
+            <p><span class="font-bold">Cliente:</span> {{ sale.customerName }}</p>
+          }
+        } @else if (order?.customerId) {
+          <p><span class="font-bold">Cliente ID:</span> {{ order?.customerId }}</p>
+        }
       </div>
 
       <div class="border-b border-dashed border-black my-2"></div>
@@ -68,6 +85,26 @@ import { Order, Product } from '../../domain/models/orders.model';
         </tbody>
       </table>
 
+      <!-- DETALLE DE ÍTEMS ANULADOS (Trazabilidad) -->
+      @if (cancelledItems && cancelledItems.length > 0) {
+        <div class="border-b border-dashed border-red-600 my-2"></div>
+        <div class="text-[9px] text-red-650 font-black uppercase mb-1">*** ÍTEMS ANULADOS (TRAZABILIDAD) ***</div>
+        <table class="w-full text-left text-[10px] text-red-600/80 italic">
+          <tbody>
+            @for (item of cancelledItems; track item.id) {
+              <tr class="align-top">
+                <td class="py-0.5 pr-2">x{{ item.payload?.quantity || 1 }}</td>
+                <td class="py-0.5">
+                  <div>{{ getProductName(item.payload?.productId) }}</div>
+                  <div class="text-[8px] font-bold">* Motivo: {{ item.payload?.cancellationReason === 'WRONG_ORDER' ? 'Error Pedido' : item.payload?.cancellationReason === 'CUSTOMER_CHANGED_MIND' ? 'Cambio Opinión' : item.payload?.cancellationReason === 'DISH_DELAYED' ? 'Plato Demorado' : 'Otro' }} - {{ item.payload?.detail }}</div>
+                </td>
+                <td class="py-0.5 text-right">S/{{ (item.payload?.quantity * item.payload?.unitPriceSnapshot) | number:'1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+
       <div class="border-b border-dashed border-black my-2"></div>
 
       <!-- TOTALES -->
@@ -92,11 +129,20 @@ import { Order, Product } from '../../domain/models/orders.model';
       @if (mode === 'venta') {
         <div class="text-[11px] space-y-1 mb-4">
           <p class="font-bold underline">Desglose de Pago:</p>
-          <div class="flex justify-between">
-            <span>Efectivo:</span>
-            <span>S/{{ total() | number:'1.2-2' }}</span>
-          </div>
-          <p class="text-[9px] text-gray-600 mt-1">Cajero: Admin General</p>
+          @if (sale && sale.payments && sale.payments.length > 0) {
+            @for (payment of sale.payments; track $index) {
+              <div class="flex justify-between">
+                <span>{{ translatePaymentMethod(payment.method) }}:</span>
+                <span>S/{{ payment.amount | number:'1.2-2' }}</span>
+              </div>
+            }
+          } @else {
+            <div class="flex justify-between">
+              <span>Efectivo:</span>
+              <span>S/{{ total() | number:'1.2-2' }}</span>
+            </div>
+          }
+          <p class="text-[9px] text-gray-650 mt-2">Cajero: Operador de Caja</p>
         </div>
         <div class="border-b border-dashed border-black my-2"></div>
       }
@@ -113,16 +159,28 @@ import { Order, Product } from '../../domain/models/orders.model';
 })
 export class PrintPreviewComponent {
   @Input() order?: Order;
+  @Input() sale?: Sale | null = null;
   @Input() tableNumber: number = 0;
   @Input() mode: 'pre-cuenta' | 'venta' = 'pre-cuenta';
   @Input() width: number = 80; // 80mm base width, customizable
+  @Input() cancelledItems: any[] = [];
 
-  // Mock lookup for product names. In real app, we load from catalog
   @Input() products: Product[] = [];
 
   getProductName(productId: number): string {
     const prod = this.products.find(p => p.id === productId);
     return prod ? prod.name : `Producto #${productId}`;
+  }
+
+  translatePaymentMethod(method: string): string {
+    switch (method) {
+      case 'CASH': return 'Efectivo';
+      case 'CARD': return 'Tarjeta';
+      case 'YAPE': return 'Yape';
+      case 'PLIN': return 'Plin';
+      case 'TRANSFER': return 'Transferencia';
+      default: return method;
+    }
   }
 
   subtotal = computed(() => {
@@ -131,7 +189,6 @@ export class PrintPreviewComponent {
   });
 
   discount = computed(() => {
-    // Check if there are any price adjustments
     if (!this.order || !this.order.priceAdjustments) return 0;
     return this.order.priceAdjustments.reduce((acc, adj) => acc + adj.newValue, 0); // Placeholder
   });

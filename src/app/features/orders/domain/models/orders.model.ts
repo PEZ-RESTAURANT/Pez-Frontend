@@ -2,6 +2,8 @@ export type OrderType = 'DINE_IN' | 'TAKEAWAY' | 'DELIVERY';
 
 export type OrderStatus = 'FREE' | 'UNATTENDED' | 'TAKING_ORDER' | 'WAITING_DISHES' | 'ALL_DELIVERED' | 'ISSUED_UNPAID' | 'PAID';
 
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ['UNATTENDED', 'TAKING_ORDER', 'WAITING_DISHES', 'ALL_DELIVERED', 'ISSUED_UNPAID'];
+
 export type OrderItemStatus = 'PENDING' | 'IN_PREPARATION' | 'READY' | 'DELIVERED';
 
 export interface OrderItem {
@@ -54,7 +56,7 @@ export interface Product {
   id: number;
   name: string;
   price: number;
-  category: string;
+  category?: { id: number; name: string } | null;
   estimatedPrepTimeMinutes: number;
   active: boolean;
 }

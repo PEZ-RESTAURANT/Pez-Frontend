@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthApi } from '../../infrastructure/api/auth.api';
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { PermissionService } from '../../../../core/auth/services/permission.service';
@@ -12,7 +12,7 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
 @Component({
   selector: 'app-login-page',
   standalone: true,
-  imports: [FormsModule, InputDirective, ButtonDirective],
+  imports: [FormsModule, InputDirective, ButtonDirective, RouterLink],
   template: `
     <div class="space-y-6">
       <div class="text-center space-y-2">
@@ -36,7 +36,15 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
         </div>
 
         <div class="space-y-1.5">
-          <label for="password" class="text-sm font-semibold text-gray-700 dark:text-gray-300">Contraseña</label>
+          <div class="flex justify-between items-center">
+            <label for="password" class="text-sm font-semibold text-gray-700 dark:text-gray-300">Contraseña</label>
+            <a
+              routerLink="/auth/forgot-password"
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold transition-all cursor-pointer"
+            >
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
           <input
             id="password"
             type="password"
@@ -93,8 +101,10 @@ export class LoginPageComponent {
           }
         });
       },
-      error: () => {
+      error: (err) => {
         this.loading = false;
+        const msg = err.error?.message || 'Correo o contraseña incorrectos. Por favor, intente de nuevo.';
+        this.notifier.error(msg);
       }
     });
   }

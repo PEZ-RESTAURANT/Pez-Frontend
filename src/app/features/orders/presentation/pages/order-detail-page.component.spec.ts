@@ -17,7 +17,7 @@ describe('OrderDetailPageComponent - Cart Logic Rules', () => {
     id: 101,
     name: 'Ceviche Clásico',
     price: 35.0,
-    category: 'MARINA',
+    category: { id: 1, name: 'MARINA' },
     estimatedPrepTimeMinutes: 12,
     active: true
   };
@@ -26,7 +26,7 @@ describe('OrderDetailPageComponent - Cart Logic Rules', () => {
     id: 102,
     name: 'Lomo Saltado',
     price: 40.0,
-    category: 'CRIOLLA',
+    category: { id: 3, name: 'CRIOLLA' },
     estimatedPrepTimeMinutes: 15,
     active: true
   };
@@ -50,7 +50,9 @@ describe('OrderDetailPageComponent - Cart Logic Rules', () => {
     const mockSessionService = {
       getRestaurantId: () => 1,
       getCurrentUserId: () => 10,
-      getToken: () => 'mock-jwt-token'
+      getToken: () => 'mock-jwt-token',
+      currentUser$: signal({ id: 10, firstName: 'Juan', lastName: 'Perez', roles: ['ADMIN'] }),
+      isAuthenticated$: signal(true)
     };
 
     const mockRouter = jasmine.createSpyObj('Router', ['navigate']);

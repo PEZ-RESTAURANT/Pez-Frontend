@@ -68,13 +68,13 @@ import { NotificationService } from '../../../../core/services/notification.serv
         <!-- LIENZO DE DIBUJO (CDK CANVAS) - 8 COLS -->
         <div class="lg:col-span-8 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-150 dark:border-gray-700 shadow-sm flex flex-col space-y-4">
           <!-- BARRA INTERNA DE ZOOMS Y VISTA -->
-          <div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
-            <div class="flex items-center gap-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
+            <div class="flex flex-wrap items-center gap-2">
               <span class="text-xs font-black uppercase text-gray-400">Zoom:</span>
               <button 
                 (click)="zoomOut()"
                 [disabled]="zoom() <= 0.5"
-                class="p-1 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-750 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-black disabled:opacity-50 cursor-pointer w-8 h-8"
+                class="p-1 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-750 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-black disabled:opacity-50 cursor-pointer w-8 h-8 flex items-center justify-center"
               >
                 -
               </button>
@@ -82,20 +82,20 @@ import { NotificationService } from '../../../../core/services/notification.serv
               <button 
                 (click)="zoomIn()"
                 [disabled]="zoom() >= 2.0"
-                class="p-1 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-750 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-black disabled:opacity-50 cursor-pointer w-8 h-8"
+                class="p-1 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-750 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-black disabled:opacity-50 cursor-pointer w-8 h-8 flex items-center justify-center"
               >
                 +
               </button>
               <button 
                 (click)="zoomReset()"
-                class="px-2 py-1 text-[10px] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-bold"
+                class="px-2 py-1.5 text-[10px] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-bold hover:bg-gray-50 dark:hover:bg-gray-850 rounded-lg transition-colors cursor-pointer border border-transparent"
               >
                 Reset
               </button>
             </div>
 
             <!-- LEYENDA ESPACIAL -->
-            <div class="flex items-center gap-4 text-[10px] font-black uppercase text-gray-400">
+            <div class="flex flex-wrap items-center gap-4 text-[10px] font-black uppercase text-gray-400">
               <div class="flex items-center gap-1.5">
                 <span class="w-2.5 h-2.5 bg-blue-500 rounded-md"></span>
                 <span>Piso Actual</span>
@@ -142,7 +142,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
                   [class.border-blue-500]="selectedTable()?.id === table.id"
                   [class.ring-2]="selectedTable()?.id === table.id"
                   [class.ring-blue-500/25]="selectedTable()?.id === table.id"
-                  class="absolute w-20 h-20 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg hover:border-blue-300 cursor-move flex flex-col items-center justify-between p-3 select-none transition-shadow"
+                  class="absolute w-24 h-24 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md hover:shadow-lg hover:border-blue-300 cursor-move flex flex-col items-center justify-between p-3.5 select-none transition-shadow"
                 >
                   <div class="w-full flex items-center justify-between">
                     <span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900 text-gray-500">
@@ -254,8 +254,14 @@ export class LayoutEditorPageComponent implements OnInit {
   public selectedTable = signal<RestaurantTable | null>(null);
   public tableForm = { number: 0, floor: 1, zoneTag: '' };
 
-  // Floors configured in the system. Default to at least Piso 1.
-  public floors = signal<number[]>([1, 2]);
+  public customFloors = signal<number[]>([]);
+  public floors = computed(() => {
+    const list = this.ordersService.tables$();
+    const floorSet = new Set<number>([1, 2]); // Start with at least 1 and 2
+    list.forEach(t => floorSet.add(t.floor));
+    this.customFloors().forEach(f => floorSet.add(f));
+    return Array.from(floorSet).sort((a, b) => a - b);
+  });
 
   // Active Floor Tables
   public activeFloorTables = computed(() => {
@@ -271,21 +277,12 @@ export class LayoutEditorPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.ordersService.loadTables();
-    
-    // Automatically identify existing floors from tables list
-    effect(() => {
-      const list = this.ordersService.tables$();
-      const floorSet = new Set<number>([1, 2]); // Start with at least 1 and 2
-      list.forEach(t => floorSet.add(t.floor));
-      const sorted = Array.from(floorSet).sort((a, b) => a - b);
-      this.floors.set(sorted);
-    }, { allowSignalWrites: true });
   }
 
   // --- FLOORS ACTIONS ---
   addNewFloor(): void {
     const nextFloor = Math.max(...this.floors()) + 1;
-    this.floors.set([...this.floors(), nextFloor]);
+    this.customFloors.update(prev => [...prev, nextFloor]);
     this.activeFloor.set(nextFloor);
     this.notify.success(`Piso ${nextFloor} habilitado en el editor.`);
   }
@@ -303,19 +300,15 @@ export class LayoutEditorPageComponent implements OnInit {
     this.zoom.set(1.0);
   }
 
-  // --- DRAG ENDED (AUTO POSITION SAVE) ---
   onDragEnded(table: RestaurantTable, event: CdkDragEnd): void {
-    const element = event.source.getRootElement();
-    const parentRect = element.parentElement!.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-
-    // Calculate drag position relative to the scaled container parent element
-    const x = Math.max(0, Math.round((elementRect.left - parentRect.left) / this.zoom()));
-    const y = Math.max(0, Math.round((elementRect.top - parentRect.top) / this.zoom()));
+    // Calculate drag position using event distance delta (completely scroll and viewport shift independent)
+    const x = Math.max(0, Math.round(table.positionX + event.distance.x));
+    const y = Math.max(0, Math.round(table.positionY + event.distance.y));
 
     this.api.updateTablePosition(table.id, x, y).subscribe({
       next: () => {
         this.notify.success(`Mesa M${table.number} posicionada.`);
+        event.source.reset(); // Clear cdkDrag translate transform so absolute positioning takes over!
         this.ordersService.loadTables();
       },
       error: (err) => {

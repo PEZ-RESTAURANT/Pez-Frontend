@@ -65,6 +65,13 @@ export const PERMISSIONS = {
   },
   PERMISSIONS: {
     MANAGE: 'permissions.manage'
+  },
+  IAM: {
+    MANAGE_ACCOUNTS: 'iam.manage_accounts'
+  },
+  RESERVATIONS: {
+    VIEW: 'reservations.view',
+    MANAGE: 'reservations.manage'
   }
 } as const;
 

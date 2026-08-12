@@ -108,14 +108,14 @@ import { Subscription, interval } from 'rxjs';
                 @if (item.status === 'PENDING') {
                   <button 
                     (click)="startPrep(item.id)"
-                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+                    class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider flex items-center justify-center min-h-[44px]"
                   >
                     Empezar
                   </button>
                 } @else if (item.status === 'IN_PREPARATION') {
                   <button 
                     (click)="markReady(item.id)"
-                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+                    class="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider flex items-center justify-center min-h-[44px]"
                   >
                     Listo
                   </button>
@@ -254,6 +254,10 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
             // Actualizar estado de preparación quirúrgicamente en el estado local
             this.queue.update(q => q.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
           }
+        } else if (type === 'ItemCancelled') {
+          const itemId = payload.itemId;
+          this.queue.update(q => q.filter(item => item.id !== itemId));
+          this.notify.warning('Un plato en cola ha sido anulado.');
         }
       }
     });

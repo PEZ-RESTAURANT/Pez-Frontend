@@ -30,6 +30,7 @@ export class OrdersService implements OnDestroy {
   public tableLocks$ = this._tableLocks.asReadonly();
 
   private realtimeSub?: Subscription;
+  private kitchenSub?: Subscription;
 
   constructor() {
     // Monitor restaurant session to subscribe to real-time events and load initial data
@@ -114,6 +115,7 @@ export class OrdersService implements OnDestroy {
       tap(() => {
         this.notify.success('Estado del plato actualizado.');
         this.loadKitchenQueue();
+        this.loadOrders();
       })
     ).subscribe();
   }
@@ -166,12 +168,26 @@ export class OrdersService implements OnDestroy {
         this.loadOrders();
       }
     });
+
+    // Suscribirse a cocina para reaccionar al cambio de estado de platos en tiempo real
+    this.kitchenSub = this.realtime.subscribeToKitchen(restaurantId).subscribe({
+      next: (event) => {
+        const type = event.eventType;
+        if (type === 'ItemStatusChanged') {
+          this.loadOrders();
+        }
+      }
+    });
   }
 
   private unsubscribeRealtime(): void {
     if (this.realtimeSub) {
       this.realtimeSub.unsubscribe();
       this.realtimeSub = undefined;
+    }
+    if (this.kitchenSub) {
+      this.kitchenSub.unsubscribe();
+      this.kitchenSub = undefined;
     }
   }
 

@@ -1,15 +1,23 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OrdersService } from '../../infrastructure/services/orders.service';
 import { OrdersApi } from '../../infrastructure/api/orders.api';
+import { CatalogApi, Category } from '../../../catalog/infrastructure/api/catalog.api';
 import { Product, Order, OrderItem } from '../../domain/models/orders.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 import { PrintPreviewComponent } from '../components/print-preview.component';
 import { environment } from '../../../../../environments/environment';
+import { LoyaltyApi } from '../../../loyalty/infrastructure/api/loyalty.api';
+import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
+import { CashRegisterApi, Sale } from '../../../cashregister/infrastructure/api/cashregister.api';
+import { ACTIVE_ORDER_STATUSES } from '../../domain/models/orders.model';
+import { PermissionService } from '../../../../core/auth/services/permission.service';
+import { PERMISSIONS } from '../../../../core/config/permissions';
+import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
 
 export interface CartLine {
   product: Product;
@@ -20,7 +28,7 @@ export interface CartLine {
 @Component({
   selector: 'app-order-detail-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent, BillingModalComponent, SelectOnFocusDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
       
@@ -59,16 +67,28 @@ export interface CartLine {
             Pre-Cuenta
           </button>
           
-          <!-- COBRAR / VENTA -->
+          <!-- EMITIR VENTA (SI NO HA SIDO EMITIDA) -->
           <button 
-            *ngIf="activeOrder()"
+            *ngIf="activeOrder() && activeOrder()?.status !== 'ISSUED_UNPAID'"
             (click)="openPrintModal('venta')"
-            class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+            class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
           >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
             Emitir Venta
+          </button>
+
+          <!-- COBRAR (SÓLO SI ESTÁ EN ALL_DELIVERED O ISSUED_UNPAID Y ROL ES CAJERO/ADMIN) -->
+          <button 
+            *ngIf="activeOrder() && (activeOrder()?.status === 'ALL_DELIVERED' || activeOrder()?.status === 'ISSUED_UNPAID') && canCollectPayment()"
+            (click)="triggerPayment()"
+            class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Cobrar
           </button>
         </div>
       </div>
@@ -110,23 +130,23 @@ export interface CartLine {
                 >
                   Todos
                 </button>
-                @for (cat of categories; track cat) {
+                @for (cat of categories(); track cat.id) {
                   <button 
-                    (click)="setSelectedCategory(cat)"
-                    [class.bg-blue-600]="selectedCategory() === cat"
-                    [class.text-white]="selectedCategory() === cat"
-                    [class.bg-gray-50]="selectedCategory() !== cat"
-                    [class.dark:bg-gray-900]="selectedCategory() !== cat"
-                    [class.text-gray-600]="selectedCategory() !== cat"
-                    [class.dark:text-gray-400]="selectedCategory() !== cat"
+                    (click)="setSelectedCategory(cat.id.toString())"
+                    [class.bg-blue-600]="selectedCategory() === cat.id.toString()"
+                    [class.text-white]="selectedCategory() === cat.id.toString()"
+                    [class.bg-gray-50]="selectedCategory() !== cat.id.toString()"
+                    [class.dark:bg-gray-900]="selectedCategory() !== cat.id.toString()"
+                    [class.text-gray-600]="selectedCategory() !== cat.id.toString()"
+                    [class.dark:text-gray-400]="selectedCategory() !== cat.id.toString()"
                     class="px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 dark:border-gray-800/80 cursor-pointer shadow-xs transition-all whitespace-nowrap"
                   >
-                    {{ cat }}
+                    {{ cat.name }}
                   </button>
                 }
               </div>
             </div>
-
+ 
             <!-- PRODUCT GRID -->
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[550px] overflow-y-auto pr-1">
               @for (prod of filteredProducts(); track prod.id) {
@@ -135,7 +155,7 @@ export interface CartLine {
                   class="bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-850 p-4 rounded-xl border border-gray-200/50 dark:border-gray-800/60 flex flex-col justify-between min-h-[120px] cursor-pointer shadow-xs transition-all hover:scale-[1.02]"
                 >
                   <div>
-                    <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">{{ prod.category }}</span>
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block mb-1">{{ prod.category?.name || '' }}</span>
                     <h4 class="font-extrabold text-sm text-gray-800 dark:text-gray-100 leading-snug line-clamp-2">{{ prod.name }}</h4>
                   </div>
                   <div class="flex justify-between items-center mt-2.5">
@@ -169,10 +189,32 @@ export interface CartLine {
                     <p *ngIf="item.note" class="text-[10px] text-gray-400 font-medium italic mt-0.5">* Obs: {{ item.note }}</p>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-500 font-bold">S/{{ (item.quantity * item.unitPriceSnapshot) | number:'1.2-2' }}</span>
-                    <span [ngClass]="getItemStatusBadgeClasses(item.status)" class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
-                      {{ getItemStatusText(item.status) }}
+                    <span class="text-gray-500 font-bold mr-1">S/{{ (item.quantity * item.unitPriceSnapshot) | number:'1.2-2' }}</span>
+                                      <span [ngClass]="getItemStatusBadgeClasses(item.status)" class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span *ngIf="item.status === 'READY'">🔔 </span>{{ getItemStatusText(item.status) }}
                     </span>
+
+                    <button
+                      *ngIf="item.status === 'READY'"
+                      (click)="markAsDelivered(item.id)"
+                      class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg cursor-pointer transition-colors shadow-2xs flex items-center gap-1 ml-1"
+                    >
+                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Entregar
+                    </button>
+
+                    <button
+                      *ngIf="canCancelItem() || canDeleteItem()"
+                      (click)="openCancelModal(item)"
+                      class="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/20 text-red-500 rounded-lg cursor-pointer transition-colors shrink-0"
+                      title="Anular plato"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               }
@@ -189,7 +231,7 @@ export interface CartLine {
         <div class="lg:col-span-4 space-y-6">
           
           <!-- CURRENT CART -->
-          <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md space-y-5">
+          <div id="cart-section" class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-md space-y-5">
             <h3 class="font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
               <svg class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -211,25 +253,25 @@ export interface CartLine {
                   <div class="flex flex-col items-end gap-2.5 shrink-0">
                     <button 
                       (click)="removeCartLine($index)"
-                      class="text-red-500 hover:text-red-600 p-0.5 rounded cursor-pointer transition-colors"
+                      class="text-red-500 hover:text-red-600 p-2.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer transition-colors"
                       title="Eliminar plato"
                     >
-                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
 
-                    <div class="flex items-center gap-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-200/60 dark:border-gray-700 p-0.5 shadow-2xs text-[10px]">
+                    <div class="flex items-center gap-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200/60 dark:border-gray-700 p-0.5 shadow-2xs text-[11px]">
                       <button 
                         (click)="decreaseCartLineQuantity($index)"
-                        class="p-1 hover:bg-gray-50 dark:hover:bg-gray-750 font-black rounded cursor-pointer"
+                        class="w-7 h-7 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-750 font-black rounded-md cursor-pointer transition-colors"
                       >
                         -
                       </button>
-                      <span class="w-4 text-center font-extrabold text-gray-900 dark:text-white">{{ line.quantity }}</span>
+                      <span class="w-6 text-center font-extrabold text-gray-900 dark:text-white">{{ line.quantity }}</span>
                       <button 
                         (click)="increaseCartLineQuantity($index)"
-                        class="p-1 hover:bg-gray-50 dark:hover:bg-gray-750 font-black rounded cursor-pointer"
+                        class="w-7 h-7 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-750 font-black rounded-md cursor-pointer transition-colors"
                       >
                         +
                       </button>
@@ -300,6 +342,22 @@ export interface CartLine {
 
       </div>
 
+      <!-- FLOATING CART BUTTON FOR MOBILE/TABLET -->
+      <div *ngIf="cart().length > 0" class="lg:hidden fixed bottom-4 left-4 right-4 z-40 animate-in slide-in-from-bottom duration-300">
+        <button 
+          (click)="scrollToCart()"
+          class="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-lg flex items-center justify-between cursor-pointer border-none"
+        >
+          <span class="flex items-center gap-2">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            Ver Comanda ({{ cart().length }} {{ cart().length === 1 ? 'plato' : 'platos' }})
+          </span>
+          <span class="text-white/95 font-extrabold">S/{{ getCartSubtotal() | number:'1.2-2' }}</span>
+        </button>
+      </div>
+
     </div>
 
     <!-- MODAL DE ADD PRODUCT QUANTITY / OBS -->
@@ -317,14 +375,14 @@ export interface CartLine {
           <div class="flex items-center gap-3">
             <button 
               (click)="decreaseQty()"
-              class="w-10 h-10 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-lg font-black rounded-lg cursor-pointer transition-colors"
+              class="w-12 h-12 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-lg font-black rounded-lg cursor-pointer transition-colors flex items-center justify-center"
             >
               -
             </button>
             <span class="w-12 text-center text-xl font-extrabold text-gray-900 dark:text-white">{{ modalQuantity() }}</span>
             <button 
               (click)="increaseQty()"
-              class="w-10 h-10 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-lg font-black rounded-lg cursor-pointer transition-colors"
+              class="w-12 h-12 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-750 text-lg font-black rounded-lg cursor-pointer transition-colors flex items-center justify-center"
             >
               +
             </button>
@@ -401,10 +459,12 @@ export interface CartLine {
       <div class="bg-gray-100 dark:bg-gray-950 p-4 rounded-xl max-h-[70vh] overflow-y-auto">
         <app-print-preview 
           [order]="activeOrder()"
+          [sale]="currentSale()"
           [tableNumber]="tableNumber()"
           [mode]="printMode()"
           [products]="products()"
           [width]="80"
+          [cancelledItems]="cancelledItems()"
         ></app-print-preview>
       </div>
 
@@ -426,6 +486,66 @@ export interface CartLine {
         </button>
       </div>
     </app-modal-shell>
+
+    <!-- ================= REUSABLE BILLING MODAL ================= -->
+    <app-billing-modal
+      [open]="isBillingModalOpen()"
+      [order]="activeOrder() || null"
+      (close)="closeBillingModal()"
+      (paymentSuccess)="onPaymentSuccess()"
+    ></app-billing-modal>
+
+    <!-- MODAL DE CANCELACIÓN DE PLATO -->
+    <app-modal-shell
+      [open]="cancelModalOpen()"
+      title="Anular Plato"
+      description="Selecciona el motivo de cancelación. Si es 'Otro', debes ingresar una justificación obligatoria."
+      [hasFooter]="true"
+      (close)="closeCancelModal()"
+    >
+      <div class="space-y-4 text-sm text-foreground">
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">Motivo de Cancelación</label>
+          <select 
+            [(ngModel)]="cancellationReason"
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          >
+            <option value="WRONG_ORDER">Error al tomar el pedido</option>
+            <option value="CUSTOMER_CHANGED_MIND">Cliente cambió de opinión</option>
+            <option value="DISH_DELAYED">Plato demoró demasiado</option>
+            <option value="OTHER">Otro motivo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">
+            Detalle/Justificación <span *ngIf="cancellationReason() === 'OTHER'" class="text-red-500">* (Obligatorio)</span>
+          </label>
+          <textarea 
+            [(ngModel)]="cancellationDetail"
+            placeholder="Describe el motivo de la cancelación..."
+            rows="3"
+            class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-3 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          ></textarea>
+        </div>
+      </div>
+
+      <div modalFooter class="flex justify-end gap-2 w-full">
+        <button 
+          (click)="closeCancelModal()"
+          class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-lg cursor-pointer transition-colors"
+        >
+          Cancelar
+        </button>
+        <button 
+          (click)="submitCancelItem()"
+          [disabled]="cancellationReason() === 'OTHER' && !cancellationDetail.trim()"
+          class="px-4 py-2 bg-red-600 hover:bg-red-750 text-white font-semibold text-xs rounded-lg cursor-pointer transition-colors shadow-xs"
+        >
+          Confirmar Anulación
+        </button>
+      </div>
+    </app-modal-shell>
   `
 })
 export class OrderDetailPageComponent implements OnInit, OnDestroy {
@@ -433,8 +553,19 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   public ordersService = inject(OrdersService);
   private api = inject(OrdersApi);
+  private catalogApi = inject(CatalogApi);
   private notify = inject(NotificationService);
   private session = inject(SessionService);
+  private loyaltyApi = inject(LoyaltyApi);
+  private cashApi = inject(CashRegisterApi);
+  private permissionService = inject(PermissionService);
+
+  public PERMISSIONS = PERMISSIONS;
+  public canCancelItem = computed(() => this.permissionService.hasPermission(this.PERMISSIONS.ORDERS.CANCEL_ITEM));
+  public canDeleteItem = computed(() => this.permissionService.hasPermission(this.PERMISSIONS.ORDERS.DELETE_ITEM));
+
+  public currentSale = signal<Sale | null>(null);
+  public cancelledItems = signal<any[]>([]);
 
   public tableId: number = 0;
   public products = signal<Product[]>([]);
@@ -460,16 +591,39 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   public printModalOpen = signal<boolean>(false);
   public printMode = signal<'pre-cuenta' | 'venta'>('pre-cuenta');
 
+  // Billing Modal State
+  public isBillingModalOpen = signal<boolean>(false);
+  public canCollectPayment = computed(() => {
+    const user = this.session.currentUser$();
+    if (!user) return false;
+    return user.roles.includes('ADMIN') || user.roles.includes('CASHIER');
+  });
+
+  // Cancel Item State
+  public cancelModalOpen = signal<boolean>(false);
+  public cancelItemObj = signal<OrderItem | null>(null);
+  public cancellationReason = signal<'WRONG_ORDER' | 'CUSTOMER_CHANGED_MIND' | 'DISH_DELAYED' | 'OTHER'>('WRONG_ORDER');
+  public cancellationDetail = '';
+
+  constructor() {
+    // Monitor activeOrder() to dynamically fetch cancellations
+    effect(() => {
+      const order = this.activeOrder();
+      if (order) {
+        this.api.getOrderCancellations(order.id).subscribe({
+          next: (events) => this.cancelledItems.set(events),
+          error: () => this.cancelledItems.set([])
+        });
+      } else {
+        this.cancelledItems.set([]);
+      }
+    });
+  }
+
   private lockRefreshInterval?: any;
 
-  // CATEGORÍAS FIJAS DE LA CARTA
-  public categories: string[] = [
-    'MARINA',
-    'CRIOLLA',
-    'BEBIDAS',
-    'CHIFA',
-    'JUGOS'
-  ];
+  // Categorías cargadas dinámicamente
+  public categories = signal<Category[]>([]);
 
   ngOnInit(): void {
     // 1. Resolver ID de Mesa desde la URL
@@ -482,6 +636,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         this.api.getProducts().subscribe({
           next: (prods) => this.products.set(prods),
           error: () => this.notify.error('No se pudo cargar el catálogo de productos.')
+        });
+
+        // Cargar categorías del catálogo
+        this.catalogApi.getCategories().subscribe({
+          next: (cats) => this.categories.set(cats),
+          error: () => this.notify.error('No se pudo cargar la lista de categorías.')
         });
 
         // 2. Iniciar timer de lock refresco cada 90 segundos
@@ -567,7 +727,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const query = this.searchTerm().toLowerCase();
 
     return prods.filter(p => {
-      const matchesCat = cat === 'ALL' || p.category === cat;
+      const pCatId = typeof p.category === 'object' && p.category ? String(p.category.id) : String(p.category);
+      const matchesCat = cat === 'ALL' || pCatId === cat;
       const matchesQuery = !query || p.name.toLowerCase().includes(query);
       return matchesCat && matchesQuery && p.active;
     });
@@ -579,7 +740,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   // ACTIVE COMANDA/ORDER (TURN CONSUMPTION)
   activeOrder = computed(() => {
-    return this.ordersService.orders$().find(o => o.tableId === this.tableId && o.status !== 'PAID');
+    return this.ordersService.orders$().find(o => o.tableId === this.tableId && ACTIVE_ORDER_STATUSES.includes(o.status));
   });
 
   getProductName(productId: number): string {
@@ -610,6 +771,49 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300': status === 'READY',
       'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300': status === 'DELIVERED'
     };
+  }
+
+  markAsDelivered(itemId: number): void {
+    const order = this.activeOrder();
+    if (!order) return;
+    this.ordersService.changeItemKitchenStatus(order.id, itemId, 'DELIVERED');
+  }
+
+  // CANCEL ITEM METHODS
+  openCancelModal(item: OrderItem): void {
+    this.cancelItemObj.set(item);
+    this.cancellationReason.set('WRONG_ORDER');
+    this.cancellationDetail = '';
+    this.cancelModalOpen.set(true);
+  }
+
+  closeCancelModal(): void {
+    this.cancelModalOpen.set(false);
+    this.cancelItemObj.set(null);
+  }
+
+  submitCancelItem(): void {
+    const order = this.activeOrder();
+    const item = this.cancelItemObj();
+    if (!order || !item) return;
+
+    const reason = this.cancellationReason();
+    const detail = this.cancellationDetail.trim();
+
+    const callObs = this.canDeleteItem()
+      ? this.api.deleteItem(order.id, item.id, reason, detail)
+      : this.api.cancelItem(order.id, item.id, reason, detail);
+
+    callObs.subscribe({
+      next: () => {
+        this.notify.success('Plato anulado con éxito.');
+        this.closeCancelModal();
+        this.ordersService.loadOrders();
+      },
+      error: (err) => {
+        this.notify.error(err.error?.message || 'No se pudo anular el plato.');
+      }
+    });
   }
 
   // CART LOGIC & MODAL SELECTIONS
@@ -686,10 +890,17 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     return this.cart().reduce((acc, line) => acc + (line.quantity * line.product.price), 0);
   }
 
+  scrollToCart(): void {
+    const el = document.getElementById('cart-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   // LOYALTY INTEGRATION
   searchLoyaltyCustomer(): void {
     if (!this.loyaltyPhone.trim()) return;
-    this.api.getCustomerByPhone(this.loyaltyPhone.trim()).subscribe({
+    this.loyaltyApi.getCustomerByPhone(this.loyaltyPhone.trim()).subscribe({
       next: (cust) => {
         this.loyaltyCustomer.set(cust);
         this.notify.success(`Cliente ${cust.fullName} vinculado.`);
@@ -757,6 +968,18 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   // PRINTING AND RECEIPT ACTIONS
   openPrintModal(mode: 'pre-cuenta' | 'venta'): void {
     this.printMode.set(mode);
+    this.currentSale.set(null);
+    const order = this.activeOrder();
+    if (mode === 'venta' && order) {
+      this.cashApi.getSales().subscribe({
+        next: (sales) => {
+          const matched = sales.find(s => s.orderId === order.id);
+          if (matched) {
+            this.currentSale.set(matched);
+          }
+        }
+      });
+    }
     this.printModalOpen.set(true);
   }
 
@@ -767,6 +990,22 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   triggerPrint(): void {
     // Disparar diálogo del navegador
     window.print();
+  }
+
+  triggerPayment(): void {
+    this.isBillingModalOpen.set(true);
+  }
+
+  closeBillingModal(): void {
+    this.isBillingModalOpen.set(false);
+  }
+
+  onPaymentSuccess(): void {
+    this.notify.success('El pago se ha registrado correctamente.');
+    this.ordersService.loadOrders();
+    this.ordersService.loadTables();
+    this.isBillingModalOpen.set(false);
+    this.router.navigate(['/app/orders']);
   }
 
   goBack(): void {

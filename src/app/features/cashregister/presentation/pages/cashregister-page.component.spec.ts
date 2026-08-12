@@ -7,6 +7,7 @@ import { RealtimeService } from '../../../../core/realtime/services/realtime.ser
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { of } from 'rxjs';
 import { Order } from '../../../orders/domain/models/orders.model';
+import { signal } from '@angular/core';
 
 describe('CashRegisterPageComponent - Logic validations', () => {
   let component: CashRegisterPageComponent;
@@ -38,17 +39,24 @@ describe('CashRegisterPageComponent - Logic validations', () => {
 
     const mockOrdersApi = {
       getTables: () => of([]),
-      getAllOrders: () => of([])
+      getAllOrders: () => of([]),
+      getActiveLocks: () => of([]),
+      getProducts: () => of([])
     };
 
     const mockNotificationService = jasmine.createSpyObj('NotificationService', ['success', 'error']);
     const mockRealtimeService = {
-      subscribeToAlerts: () => of({ eventType: '', payload: {} })
+      subscribeToAlerts: () => of({ eventType: '', payload: {} }),
+      subscribeToTables: () => of({ eventType: '', payload: {} }),
+      subscribeToOrders: () => of({ eventType: '', payload: {} }),
+      subscribeToKitchen: () => of({ eventType: '', payload: {} })
     };
     const mockSessionService = {
       getRestaurantId: () => 1,
       getCurrentUserId: () => 5,
-      getToken: () => 'token'
+      getToken: () => 'token',
+      currentUser$: signal({ id: 5, firstName: 'Caja', lastName: 'Turno', roles: ['CASHIER'] }),
+      isAuthenticated$: signal(true)
     };
 
     await TestBed.configureTestingModule({

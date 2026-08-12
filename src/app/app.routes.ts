@@ -23,6 +23,14 @@ export const routes: Routes = [
       {
         path: 'login',
         loadComponent: () => import('./features/auth/presentation/pages/login-page.component').then(m => m.LoginPageComponent)
+      },
+      {
+        path: 'forgot-password',
+        loadComponent: () => import('./features/auth/presentation/pages/forgot-password-page.component').then(m => m.ForgotPasswordPageComponent)
+      },
+      {
+        path: 'reset-password',
+        loadComponent: () => import('./features/auth/presentation/pages/reset-password-page.component').then(m => m.ResetPasswordPageComponent)
       }
     ]
   },
@@ -95,6 +103,24 @@ export const routes: Routes = [
         data: { permission: PERMISSIONS.CATALOG.EDIT_KITCHEN_ZONES }
       },
       {
+        path: 'admin/staff-accounts',
+        loadComponent: () => import('./features/staff/presentation/pages/staff-accounts-page.component').then(m => m.StaffAccountsPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.IAM.MANAGE_ACCOUNTS }
+      },
+      {
+        path: 'admin/permissions',
+        loadComponent: () => import('./features/staff/presentation/pages/user-permissions-page.component').then(m => m.UserPermissionsPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.PERMISSIONS.MANAGE }
+      },
+      {
+        path: 'admin/settings',
+        loadComponent: () => import('./features/orders/presentation/pages/operational-settings-page.component').then(m => m.OperationalSettingsPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.CATALOG.EDIT_SCHEDULES_THRESHOLDS }
+      },
+      {
         path: 'loyalty',
         loadComponent: () => import('./features/loyalty/presentation/pages/loyalty-page.component').then(m => m.LoyaltyPageComponent),
         canActivate: [permissionGuard],
@@ -105,6 +131,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/analytics/presentation/pages/analytics-page.component').then(m => m.AnalyticsPageComponent),
         canActivate: [permissionGuard],
         data: { permission: PERMISSIONS.ANALYTICS.VIEW }
+      },
+      {
+        path: 'reservations',
+        loadComponent: () => import('./features/orders/presentation/pages/reservations-page.component').then(m => m.ReservationsPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.RESERVATIONS.VIEW }
       }
     ]
   },

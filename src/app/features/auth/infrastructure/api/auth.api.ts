@@ -18,4 +18,17 @@ export class AuthApi extends BaseApiService {
       password
     });
   }
+
+  forgotPassword(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/auth/forgot-password`, {
+      email
+    });
+  }
+
+  resetPassword(token: string, newPassword: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/auth/reset-password`, {
+      token,
+      newPassword
+    });
+  }
 }

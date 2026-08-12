@@ -9,11 +9,12 @@ import { RealtimeService } from '../../../../core/realtime/services/realtime.ser
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 import { Subscription } from 'rxjs';
+import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
 
 @Component({
   selector: 'app-cashregister-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
 
@@ -42,16 +43,16 @@ import { Subscription } from 'rxjs';
         </div>
 
         @if (isOpen()) {
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <button 
               (click)="openMovementModal()"
-              class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+              class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider min-h-[44px]"
             >
               Movimiento Manual
             </button>
             <button 
               (click)="openCloseShiftModal()"
-              class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+              class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider min-h-[44px]"
             >
               Cerrar Turno
             </button>
@@ -164,7 +165,7 @@ import { Subscription } from 'rxjs';
                     </span>
                     <button 
                       (click)="startBillingFlow(order)"
-                      class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+                      class="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider min-h-[44px] flex items-center justify-center"
                     >
                       Cobrar
                     </button>
@@ -381,224 +382,12 @@ import { Subscription } from 'rxjs';
     </app-modal-shell>
 
     <!-- ================= MODAL COBRO DE CUENTA ================= -->
-    <app-modal-shell
+    <app-billing-modal
       [open]="isBillingModalOpen()"
-      title="Cobro de Comanda"
-      [description]="'Registra el comprobante y los pagos para la Comanda #' + (selectedOrder()?.id)"
+      [order]="selectedOrder()"
       (close)="closeBillingModal()"
-    >
-      @if (billingStep() === 1) {
-        
-        <!-- STEP 1: EMISION DE COMPROBANTE -->
-        <form (submit)="emitReceipt()" class="space-y-4">
-          <div>
-            <label class="block text-xs font-black uppercase text-gray-400 mb-1">Tipo de Comprobante</label>
-            <div class="grid grid-cols-2 gap-2">
-              <button 
-                type="button"
-                (click)="billingForm.documentType = 'BOLETA'"
-                [class.bg-blue-600]="billingForm.documentType === 'BOLETA'"
-                [class.text-white]="billingForm.documentType === 'BOLETA'"
-                [class.border-blue-600]="billingForm.documentType === 'BOLETA'"
-                [class.bg-gray-50]="billingForm.documentType !== 'BOLETA'"
-                [class.dark:bg-gray-900]="billingForm.documentType !== 'BOLETA'"
-                class="py-2.5 rounded-xl text-xs font-black border cursor-pointer text-center transition-all"
-              >
-                Boleta
-              </button>
-              <button 
-                type="button"
-                (click)="billingForm.documentType = 'FACTURA_ELECTRONICA'"
-                [class.bg-blue-600]="billingForm.documentType === 'FACTURA_ELECTRONICA'"
-                [class.text-white]="billingForm.documentType === 'FACTURA_ELECTRONICA'"
-                [class.border-blue-600]="billingForm.documentType === 'FACTURA_ELECTRONICA'"
-                [class.bg-gray-50]="billingForm.documentType !== 'FACTURA_ELECTRONICA'"
-                [class.dark:bg-gray-900]="billingForm.documentType !== 'FACTURA_ELECTRONICA'"
-                class="py-2.5 rounded-xl text-xs font-black border cursor-pointer text-center transition-all"
-              >
-                Factura
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-xs font-black uppercase text-gray-400 mb-1">
-              {{ billingForm.documentType === 'FACTURA_ELECTRONICA' ? 'RUC del Cliente' : 'Documento (DNI/RUC - Opcional)' }}
-            </label>
-            <input 
-              type="text" 
-              [(ngModel)]="billingForm.customerDocumentNumber"
-              name="docNum"
-              (ngModelChange)="onRucChange($event)"
-              [required]="billingForm.documentType === 'FACTURA_ELECTRONICA'"
-              placeholder="Ej. 20601234567"
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs font-black uppercase text-gray-400 mb-1">
-              {{ billingForm.documentType === 'FACTURA_ELECTRONICA' ? 'Razón Social' : 'Nombre del Cliente (Opcional)' }}
-            </label>
-            <input 
-              type="text" 
-              [(ngModel)]="billingForm.customerName"
-              name="custName"
-              [required]="billingForm.documentType === 'FACTURA_ELECTRONICA'"
-              placeholder="Ej. Alimentos del Mar S.A.C."
-              class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div class="pt-4 flex items-center justify-between border-t border-gray-150 dark:border-gray-700/60">
-            <span class="text-sm font-bold text-gray-500">Total a Cobrar:</span>
-            <span class="text-xl font-black text-gray-900 dark:text-white">
-              S/{{ selectedOrderSaleTotal().toFixed(2) }}
-            </span>
-          </div>
-
-          <div class="flex justify-end gap-2 pt-2">
-            <button 
-              type="button" 
-              (click)="closeBillingModal()"
-              class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button 
-              type="submit"
-              [disabled]="billingForm.documentType === 'FACTURA_ELECTRONICA' && (!billingForm.customerDocumentNumber || billingForm.customerDocumentNumber.length !== 11)"
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl cursor-pointer"
-            >
-              Emitir Comprobante
-            </button>
-          </div>
-        </form>
-
-      } @else if (billingStep() === 2) {
-        
-        <!-- STEP 2: REGISTRO DE PAGOS DIVISIBLES -->
-        <div class="space-y-5">
-          <div class="p-4 bg-gray-50 dark:bg-gray-950/30 rounded-xl border border-gray-100 dark:border-gray-800 flex flex-wrap gap-x-6 gap-y-2 text-xs font-bold justify-between">
-            <div>
-              <span class="text-gray-400 block mb-0.5">Total de la Cuenta</span>
-              <span class="text-base font-black text-gray-800 dark:text-gray-200">S/{{ selectedOrderSaleTotal().toFixed(2) }}</span>
-            </div>
-            <div>
-              <span class="text-gray-400 block mb-0.5">Monto Registrado</span>
-              <span class="text-base font-black text-blue-600 dark:text-blue-400">S/{{ getRegisteredSum().toFixed(2) }}</span>
-            </div>
-            <div>
-              <span class="text-gray-400 block mb-0.5">Saldo Restante</span>
-              <span 
-                [class.text-red-500]="getRemainingAmount() > 0"
-                [class.text-emerald-500]="getRemainingAmount() === 0"
-                [class.text-amber-500]="getRemainingAmount() < 0"
-                class="text-base font-black"
-              >
-                S/{{ getRemainingAmount().toFixed(2) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h4 class="text-xs font-black uppercase text-gray-400">Métodos de Pago</h4>
-              <button 
-                type="button"
-                (click)="addPaymentLine()"
-                class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold cursor-pointer"
-              >
-                + Añadir Método
-              </button>
-            </div>
-
-            <!-- PAYMENT LINES -->
-            @for (line of paymentLines; track $index) {
-              <div class="flex gap-2 items-center">
-                <select 
-                  [(ngModel)]="line.method"
-                  class="flex-1 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white"
-                >
-                  @for (opt of paymentMethodsOptions(); track opt.id) {
-                    <option [value]="opt.type">{{ opt.name }}</option>
-                  }
-                </select>
-
-                <input 
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  [(ngModel)]="line.amount"
-                  placeholder="0.00"
-                  class="w-32 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-black text-xs text-gray-900 dark:text-white text-right"
-                />
-
-                @if (paymentLines.length > 1) {
-                  <button 
-                    type="button"
-                    (click)="removePaymentLine($index)"
-                    class="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg cursor-pointer"
-                  >
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                }
-              </div>
-            }
-          </div>
-
-          <div class="flex justify-end gap-2 pt-2 border-t border-gray-150 dark:border-gray-700/60">
-            <button 
-              type="button" 
-              (click)="closeBillingModal()"
-              class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button 
-              type="button"
-              (click)="confirmPayments()"
-              [disabled]="!isPaymentComplete()"
-              class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
-            >
-              Confirmar Pago
-            </button>
-          </div>
-        </div>
-
-      } @else if (billingStep() === 3) {
-        
-        <!-- STEP 3: CONFIRMACIÓN EXITOSA -->
-        <div class="text-center py-6 space-y-4">
-          <div class="inline-flex p-3 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full animate-bounce">
-            <svg class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          
-          <div class="space-y-1">
-            <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Pago Registrado</h3>
-            <p class="text-sm text-gray-500">
-              La comanda ha sido cobrada y cancelada con éxito.
-            </p>
-            <span class="text-xs text-gray-400 block pt-1 font-bold">Hora del cobro: {{ successTime() | date:'mediumTime' }}</span>
-          </div>
-
-          <div class="pt-4">
-            <button 
-              (click)="closeBillingModal()"
-              class="px-6 py-2.5 bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white dark:text-gray-900 text-white font-black text-xs rounded-xl cursor-pointer shadow-sm uppercase tracking-wider"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
-
-      }
-    </app-modal-shell>
+      (paymentSuccess)="loadState()"
+    ></app-billing-modal>
 
     <!-- ================= MODAL CIERRE DE TURNO ================= -->
     <app-modal-shell

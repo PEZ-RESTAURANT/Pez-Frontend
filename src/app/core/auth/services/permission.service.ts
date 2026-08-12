@@ -1,6 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { APP_SETTINGS } from '../../config/app.settings';
+import { BaseApiService } from '../../http/base-api.service';
 import { SessionService } from './session.service';
 import { Observable, of } from 'rxjs';
 import { tap, catchError } from 'rxjs/operators';
@@ -13,13 +12,19 @@ export interface UserPermission {
 }
 
 @Injectable({ providedIn: 'root' })
-export class PermissionService {
-  private http = inject(HttpClient);
+export class PermissionService extends BaseApiService {
   private session = inject(SessionService);
   private _permissions = signal<Set<string>>(new Set());
 
   // Expose signal of permissions (Set of strings) as readonly
   public permissions$ = this._permissions.asReadonly();
+
+  constructor() {
+    super();
+    if (this.session.isAuthenticated$()) {
+      this.loadPermissions().subscribe();
+    }
+  }
 
   loadPermissions(): Observable<UserPermission[]> {
     if (!this.session.isAuthenticated$()) {
@@ -27,7 +32,7 @@ export class PermissionService {
       return of([]);
     }
 
-    return this.http.get<UserPermission[]>(`${APP_SETTINGS.apiUrl}/v1/accounts/me/permissions`).pipe(
+    return this.http.get<UserPermission[]>(`${this.baseUrl}/accounts/me/permissions`).pipe(
       tap((perms) => {
         const grantedSet = new Set<string>();
         perms.forEach((p) => {

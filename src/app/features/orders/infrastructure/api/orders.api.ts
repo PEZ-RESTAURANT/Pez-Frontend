@@ -103,7 +103,21 @@ export class OrdersApi extends BaseApiService {
     return this.http.get<Product[]>(`${this.baseUrl}/products`);
   }
 
-  getCustomerByPhone(phone: string): Observable<any> {
-    return this.http.get<any>(`${this.baseUrl}/customers/by-phone/${phone}`);
+  cancelItem(orderId: number, itemId: number, reason: string, detail: string): Observable<void> {
+    let params = new HttpParams()
+      .set('cancellationReason', reason)
+      .set('detail', detail);
+    return this.http.post<void>(`${this.baseUrl}/orders/${orderId}/items/${itemId}/cancel`, null, { params });
+  }
+
+  deleteItem(orderId: number, itemId: number, reason: string, detail: string): Observable<void> {
+    let params = new HttpParams()
+      .set('cancellationReason', reason)
+      .set('detail', detail);
+    return this.http.delete<void>(`${this.baseUrl}/orders/${orderId}/items/${itemId}`, { params });
+  }
+
+  getOrderCancellations(orderId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/orders/${orderId}/cancellations`);
   }
 }

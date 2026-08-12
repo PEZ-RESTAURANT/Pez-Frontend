@@ -8,11 +8,15 @@ import { RestaurantTable } from '../../domain/models/orders.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
+import { ReservationsApi, Reservation } from '../../infrastructure/api/reservations.api';
+import { OperationalConfigApi, OperationalConfig } from '../../infrastructure/api/operational-config.api';
+import { Order, ACTIVE_ORDER_STATUSES } from '../../domain/models/orders.model';
+import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
 
 @Component({
   selector: 'app-orders-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
       
@@ -112,31 +116,63 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
 
       <!-- VISTA MAPA DE MESAS (LAYOUT FÍSICO) -->
       <div *ngIf="viewMode() === 'map'" class="relative min-h-[600px] w-full bg-slate-50 dark:bg-gray-900/30 rounded-2xl border border-gray-200/60 dark:border-gray-800 shadow-inner p-4 overflow-auto">
-        <!-- Selector de Piso -->
-        <div class="absolute top-4 left-4 z-10 inline-flex p-1 bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-xl border border-gray-250/50 dark:border-gray-700 shadow-xs">
-          @for (f of floors(); track f) {
+        <!-- Selector de Piso y Zoom -->
+        <div class="absolute top-4 left-4 z-10 flex flex-wrap gap-2">
+          <!-- Selector de Piso -->
+          <div class="inline-flex p-1 bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-xl border border-gray-250/50 dark:border-gray-700 shadow-xs">
+            @for (f of floors(); track f) {
+              <button 
+                (click)="activeFloor.set(f)"
+                [class.bg-blue-600]="activeFloor() === f"
+                [class.text-white]="activeFloor() === f"
+                [class.text-gray-500]="activeFloor() !== f"
+                class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                Piso {{ f }}
+              </button>
+            }
+          </div>
+
+          <!-- Controles de Zoom -->
+          <div class="inline-flex items-center gap-1.5 p-1 bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-xl border border-gray-250/50 dark:border-gray-700 shadow-xs">
             <button 
-              (click)="activeFloor.set(f)"
-              [class.bg-blue-600]="activeFloor() === f"
-              [class.text-white]="activeFloor() === f"
-              [class.text-gray-500]="activeFloor() !== f"
-              class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer"
+              (click)="zoomOut()" 
+              [disabled]="zoom() <= 0.5" 
+              class="w-7 h-7 bg-gray-50 dark:bg-gray-900 hover:bg-gray-150 dark:hover:bg-gray-750 text-xs font-black rounded-lg cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center"
             >
-              Piso {{ f }}
+              -
             </button>
-          }
+            <span class="text-[10px] font-black text-gray-700 dark:text-gray-300 w-10 text-center">{{ (zoom() * 100).toFixed(0) }}%</span>
+            <button 
+              (click)="zoomIn()" 
+              [disabled]="zoom() >= 1.5" 
+              class="w-7 h-7 bg-gray-50 dark:bg-gray-900 hover:bg-gray-150 dark:hover:bg-gray-750 text-xs font-black rounded-lg cursor-pointer transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <!-- Contenedor del Layout a Escala -->
-        <div class="relative w-[1200px] h-[800px] mt-12">
+        <div 
+          [style.transform]="'scale(' + zoom() + ')'"
+          [style.transformOrigin]="'top left'"
+          class="relative w-[1200px] h-[800px] mt-16 transition-transform duration-100"
+        >
           @for (table of activeFloorTables(); track table.id) {
             <div 
               (click)="onTableClick(table)"
               [ngClass]="getStatusClasses(table)"
               [style.left.px]="table.positionX"
               [style.top.px]="table.positionY"
-              class="absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-between p-3.5 cursor-pointer relative shadow-md transition-all duration-300 transform hover:scale-[1.03]"
+              class="absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-between p-3.5 cursor-pointer shadow-md transition-all duration-300 transform hover:scale-[1.03]"
             >
+              <!-- Indicador de platos READY (Listo para entregar) -->
+              @if (hasReadyItems(table.id)) {
+                <div class="absolute -top-2.5 -left-2.5 bg-emerald-600 border border-emerald-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center shadow-lg animate-bounce z-25" title="¡Platos listos para entregar!">
+                  🔔
+                </div>
+              }
               
               <!-- Icono superior/fusión/bloqueo -->
               <div class="w-full flex items-center justify-between">
@@ -144,18 +180,38 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                   M{{ table.number }}
                 </span>
                 
-                <!-- Icono de anclaje de fusión -->
-                <span *ngIf="table.anchorTableId" class="text-purple-650 dark:text-purple-400" title="Mesa fusionada">
-                  <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                </span>
+                <div class="flex items-center gap-1">
+                  <!-- Indicador de retraso/demora -->
+                  @if (isTableAttentionDelayed(table) || isTableDishesDelayed(table)) {
+                    <span class="text-red-650 dark:text-red-500 animate-pulse" [title]="'¡RETRASO! Tiempo transcurrido: ' + getTableDelayMinutes(table) + ' min'">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </span>
+                  }
+
+                  <!-- Icono de anclaje de fusión -->
+                  <span *ngIf="table.anchorTableId" class="text-purple-650 dark:text-purple-400" title="Mesa fusionada">
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </span>
+                </div>
               </div>
 
               <!-- Numero de Mesa Central / Zona -->
               <div class="text-center">
                 <span class="text-xs font-black text-gray-900 dark:text-white leading-none block">M{{ table.number }}</span>
                 <span class="text-[9px] text-gray-400 font-bold block mt-1 uppercase">{{ table.zoneTag || 'Salón' }}</span>
+                @if (table.anchorTableId) {
+                  <span class="text-[8px] bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-black px-1.5 py-0.5 rounded-sm block mt-1.5 whitespace-nowrap">
+                    Unida a M{{ getAnchorTableNumber(table.anchorTableId) }}
+                  </span>
+                } @else if (isAnchorTable(table.id)) {
+                  <span class="text-[8px] bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black px-1.5 py-0.5 rounded-sm block mt-1.5 whitespace-nowrap">
+                    Ancla M{{ table.number }}
+                  </span>
+                }
               </div>
 
               <!-- Bloqueo del Mozo inferior -->
@@ -168,6 +224,13 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                 }
               </div>
 
+              <!-- Reservación del día sobrepuesta -->
+              @if (getTableReservation(table.id); as res) {
+                <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-yellow-100 border border-yellow-350 dark:bg-yellow-950/40 dark:border-yellow-900/50 text-[8px] text-yellow-800 dark:text-yellow-400 font-black px-1 py-0.5 rounded-md whitespace-nowrap shadow-xs pointer-events-none select-none z-10">
+                  📅 {{ res.reservationDateTime | date:'HH:mm' }} - {{ res.customerName }}
+                </div>
+              }
+
               <!-- Botón Desunir si es Ancla -->
               <button 
                 *ngIf="isAnchorTable(table.id)"
@@ -178,6 +241,16 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                 <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
+              </button>
+
+              <!-- Botón Cobrar si está en ALL_DELIVERED o ISSUED_UNPAID y rol es ADMIN/CASHIER -->
+              <button
+                *ngIf="(table.status === 'ALL_DELIVERED' || table.status === 'ISSUED_UNPAID') && canCollectPayment()"
+                (click)="onCollectPaymentClick($event, table)"
+                class="absolute -bottom-2 -left-2 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black rounded-lg shadow-md border border-emerald-500 cursor-pointer uppercase tracking-wider transition-colors z-20"
+                title="Cobrar Mesa"
+              >
+                Cobrar
               </button>
             </div>
           }
@@ -195,23 +268,52 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
               <div>
                 <span class="text-2xl font-black text-gray-900 dark:text-white">Mesa {{ table.number }}</span>
                 <span class="text-xs text-gray-400 block mt-0.5 uppercase">{{ table.zoneTag || 'Salón' }}</span>
+                @if (getTableReservation(table.id); as res) {
+                  <span class="mt-1 inline-block px-2 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-400 text-[9px] font-black uppercase rounded">
+                    📅 {{ res.reservationDateTime | date:'HH:mm' }} - {{ res.customerName }}
+                  </span>
+                }
+                @if (isTableAttentionDelayed(table) || isTableDishesDelayed(table)) {
+                  <span class="mt-1 inline-block px-2 py-0.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[9px] font-black uppercase rounded animate-pulse">
+                    ⚠️ RETRASO (+{{ getTableDelayMinutes(table) }} min)
+                  </span>
+                }
+                @if (hasReadyItems(table.id)) {
+                  <span class="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 text-[10px] font-black uppercase rounded-lg animate-bounce">
+                    🔔 Plato Listo para Entregar
+                  </span>
+                }
               </div>
-              <span [ngClass]="getStatusBadgeClasses(table.status)" class="text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider">
+              <span [ngClass]="getStatusBadgeClasses(table.status)" class="text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider animate-in">
                 {{ getStatusText(table) }}
               </span>
             </div>
 
             <!-- Lock Info -->
-            <div class="flex items-center justify-between text-xs border-t border-gray-100 dark:border-gray-700/60 pt-4 mt-2">
+            <div class="flex items-center justify-between text-xs border-t border-gray-150 dark:border-gray-700/60 pt-4 mt-2">
               <span class="text-gray-400 font-medium">Estado del Lock:</span>
               @if (isTableLocked(table.id)) {
-                <span class="text-red-600 dark:text-red-400 font-bold flex items-center gap-1">
+                <span class="text-red-650 dark:text-red-400 font-bold flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
                   En uso por {{ getLockWaiter(table.id) }}
                 </span>
               } @else {
                 <span class="text-emerald-600 dark:text-emerald-400 font-bold">Disponible</span>
               }
+            </div>
+
+            <!-- Botón Cobrar si está en ALL_DELIVERED o ISSUED_UNPAID y rol es ADMIN/CASHIER -->
+            <div 
+              *ngIf="(table.status === 'ALL_DELIVERED' || table.status === 'ISSUED_UNPAID') && canCollectPayment()"
+              class="mt-4 pt-3 border-t border-gray-150 dark:border-gray-700/60 flex justify-end"
+              (click)="$event.stopPropagation()"
+            >
+              <button 
+                (click)="onCollectPaymentClick($event, table)"
+                class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider text-center"
+              >
+                Cobrar Cuenta
+              </button>
             </div>
           </div>
         }
@@ -341,21 +443,51 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         </button>
       </div>
     </app-modal-shell>
+
+    <!-- ================= REUSABLE BILLING MODAL ================= -->
+    <app-billing-modal
+      [open]="isBillingModalOpen()"
+      [order]="selectedOrderForBilling()"
+      (close)="onBillingModalClose()"
+      (paymentSuccess)="onPaymentSuccess()"
+    ></app-billing-modal>
   `
 })
 export class OrdersPageComponent implements OnInit {
   public ordersService = inject(OrdersService);
   private api = inject(OrdersApi);
+  private reservationsApi = inject(ReservationsApi);
+  private configApi = inject(OperationalConfigApi);
   private notify = inject(NotificationService);
   private router = inject(Router);
   private session = inject(SessionService);
 
+  public todayReservations = signal<Reservation[]>([]);
+  public opConfig = signal<OperationalConfig | null>(null);
+
   public viewMode = signal<'map' | 'cards'>('map');
   public activeFloor = signal<number>(1);
+  public zoom = signal<number>(1.0);
+
+  zoomIn(): void {
+    this.zoom.set(Math.min(1.5, this.zoom() + 0.1));
+  }
+
+  zoomOut(): void {
+    this.zoom.set(Math.max(0.5, this.zoom() - 0.1));
+  }
 
   // Modal signals
   public mergeModalOpen = signal<boolean>(false);
   public transferModalOpen = signal<boolean>(false);
+  public isBillingModalOpen = signal<boolean>(false);
+  public selectedOrderForBilling = signal<Order | null>(null);
+
+  public canCollectPayment = computed(() => {
+    const user = this.session.currentUser$();
+    if (!user) return false;
+    return user.roles.includes('ADMIN') || user.roles.includes('CASHIER');
+  });
 
   // Merge state variables
   public selectedAnchorId: number | null = null;
@@ -381,6 +513,66 @@ export class OrdersPageComponent implements OnInit {
     this.ordersService.loadTables();
     this.ordersService.loadTableLocks();
     this.ordersService.loadOrders();
+    this.loadTodayReservations();
+    this.loadOperationalConfig();
+  }
+
+  loadOperationalConfig(): void {
+    this.configApi.getConfig().subscribe({
+      next: (cfg) => this.opConfig.set(cfg),
+      error: () => console.warn('No se pudo cargar la configuración operativa para el mapa.')
+    });
+  }
+
+  loadTodayReservations(): void {
+    const todayStr = (new Date(Date.now() - (new Date().getTimezoneOffset() * 60000))).toISOString().split('T')[0];
+    this.reservationsApi.getReservations(todayStr, 'CONFIRMED').subscribe({
+      next: (data) => this.todayReservations.set(data),
+      error: () => console.warn('No se pudieron cargar las reservas de hoy para el mapa.')
+    });
+  }
+
+  getTableReservation(tableId: number): Reservation | undefined {
+    return this.todayReservations().find(r => r.tableId === tableId);
+  }
+
+  getTableActiveOrder(tableId: number): Order | undefined {
+    return this.ordersService.orders$().find(o => o.tableId === tableId && ACTIVE_ORDER_STATUSES.includes(o.status));
+  }
+
+  hasReadyItems(tableId: number): boolean {
+    const order = this.getTableActiveOrder(tableId);
+    if (!order) return false;
+    return order.items.some(item => item.status === 'READY');
+  }
+
+  isTableAttentionDelayed(table: RestaurantTable): boolean {
+    if (table.status !== 'UNATTENDED') return false;
+    const cfg = this.opConfig();
+    if (!cfg) return false;
+    const order = this.getTableActiveOrder(table.id);
+    if (!order) return false;
+    const diffMs = new Date().getTime() - new Date(order.createdAt).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    return diffMin >= cfg.unattendedThresholdMinutes;
+  }
+
+  isTableDishesDelayed(table: RestaurantTable): boolean {
+    if (table.status !== 'WAITING_DISHES') return false;
+    const cfg = this.opConfig();
+    if (!cfg) return false;
+    const order = this.getTableActiveOrder(table.id);
+    if (!order) return false;
+    const diffMs = new Date().getTime() - new Date(order.createdAt).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    return diffMin >= cfg.waitingDishesThresholdMinutes;
+  }
+
+  getTableDelayMinutes(table: RestaurantTable): number {
+    const order = this.getTableActiveOrder(table.id);
+    if (!order) return 0;
+    const diffMs = new Date().getTime() - new Date(order.createdAt).getTime();
+    return Math.floor(diffMs / 60000);
   }
 
   setViewMode(mode: 'map' | 'cards'): void {
@@ -516,10 +708,11 @@ export class OrdersPageComponent implements OnInit {
 
   mergeableChildTables = computed(() => {
     // Mesas que pueden seleccionarse como secundarias (deben estar libres y sin fusiones previas)
+    const anchorId = this.selectedAnchorId ? Number(this.selectedAnchorId) : null;
     return this.ordersService.tables$().filter(t => 
       t.status === 'FREE' && 
       !t.anchorTableId && 
-      t.id !== this.selectedAnchorId
+      t.id !== anchorId
     );
   });
 
@@ -549,6 +742,11 @@ export class OrdersPageComponent implements OnInit {
 
   isAnchorTable(tableId: number): boolean {
     return this.ordersService.tables$().some(t => t.anchorTableId === tableId);
+  }
+
+  getAnchorTableNumber(anchorId: number): number | null {
+    const anchor = this.ordersService.tables$().find(t => t.id === anchorId);
+    return anchor ? anchor.number : null;
   }
 
   onUnmergeClick(event: MouseEvent, anchorTableId: number): void {
@@ -590,5 +788,28 @@ export class OrdersPageComponent implements OnInit {
       },
       error: () => this.notify.error('No se pudo trasladar la comanda.')
     });
+  }
+
+  onCollectPaymentClick(event: MouseEvent, table: RestaurantTable): void {
+    event.stopPropagation();
+    const order = this.getTableActiveOrder(table.id);
+    if (!order) {
+      this.notify.error('No se encontró una comanda activa para cobrar en esta mesa.');
+      return;
+    }
+    this.selectedOrderForBilling.set(order);
+    this.isBillingModalOpen.set(true);
+  }
+
+  onBillingModalClose(): void {
+    this.isBillingModalOpen.set(false);
+    this.selectedOrderForBilling.set(null);
+  }
+
+  onPaymentSuccess(): void {
+    this.notify.success('El pago se ha registrado correctamente.');
+    this.ordersService.loadTables();
+    this.ordersService.loadOrders();
+    this.onBillingModalClose();
   }
 }
