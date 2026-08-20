@@ -50,90 +50,205 @@ import { Subscription, interval } from 'rxjs';
         </div>
       </div>
 
+      <!-- KDS TOOLBAR (TABS AND FILTERS) -->
+      <div *ngIf="selectedZoneId()" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-150 dark:border-gray-700 shadow-2xs">
+        <!-- Tabs -->
+        <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl w-fit">
+          <button 
+            (click)="currentTab.set('active')"
+            [class.bg-white]="currentTab() === 'active'"
+            [class.dark:bg-gray-800]="currentTab() === 'active'"
+            [class.text-blue-600]="currentTab() === 'active'"
+            [class.dark:text-blue-400]="currentTab() === 'active'"
+            [class.text-gray-500]="currentTab() !== 'active'"
+            class="px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none"
+          >
+            📋 Cola Activa ({{ activeGroups().length }})
+          </button>
+          <button 
+            (click)="currentTab.set('history')"
+            [class.bg-white]="currentTab() === 'history'"
+            [class.dark:bg-gray-800]="currentTab() === 'history'"
+            [class.text-blue-600]="currentTab() === 'history'"
+            [class.dark:text-blue-400]="currentTab() === 'history'"
+            [class.text-gray-500]="currentTab() !== 'history'"
+            class="px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition-all border-none"
+          >
+            ✓ Historial completados ({{ completedGroups().length }})
+          </button>
+        </div>
+
+        <!-- History configuration selector -->
+        <div *ngIf="currentTab() === 'history'" class="flex items-center gap-2 animate-in fade-in">
+          <label class="text-[10px] font-black uppercase text-gray-400">Ver completados de las últimas:</label>
+          <select 
+            [(ngModel)]="historyHours"
+            class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-none"
+          >
+            <option [value]="1">1 hora</option>
+            <option [value]="3">3 horas (Default)</option>
+            <option [value]="6">6 horas</option>
+            <option [value]="12">12 horas</option>
+          </select>
+        </div>
+      </div>
+
       <!-- BOARD DE PREPARACIONES (KDS GRID) -->
       @if (selectedZoneId()) {
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          @for (group of groupedQueue(); track group.orderId) {
-            <div 
-              class="rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 flex flex-col justify-between min-h-[220px] shadow-sm transition-all duration-300 relative"
-            >
-              
-              <!-- CARD HEADER -->
-              <div class="space-y-4">
-                <div class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/60">
-                  <!-- MESA / PEDIDO ORIGEN -->
-                  <span class="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-750 dark:text-gray-300">
-                    {{ group.tableNumber ? 'Mesa M' + group.tableNumber : 'Para Llevar' }}
-                  </span>
-                  
-                  <!-- ID DE COMANDA -->
-                  <span class="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
-                    Pedido #{{ group.orderId }}
-                  </span>
-                </div>
+        
+        <!-- Tab 1: Active Queue -->
+        @if (currentTab() === 'active') {
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-200">
+            @for (group of activeGroups(); track group.orderId + '-' + group.createdAt) {
+              <div 
+                [class]="getGroupUrgencyClass(group)"
+                class="rounded-2xl border-2 p-5 flex flex-col justify-between min-h-[220px] shadow-sm transition-all duration-300 relative"
+              >
+                
+                <!-- CARD HEADER -->
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/60">
+                    <!-- TICKET ORIGIN -->
+                    <span class="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-750 dark:text-gray-300">
+                      {{ getOrderTypeLabel(group) }}
+                    </span>
+                    
+                    <!-- ID DE COMANDA -->
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
+                      Pedido #{{ group.orderId }}
+                    </span>
+                  </div>
 
-                <!-- ITEMS LIST -->
-                <div class="divide-y divide-gray-100 dark:divide-gray-700/60 space-y-3">
-                  @for (item of group.items; track item.id) {
-                    <div class="pt-2 flex flex-col gap-1.5 transition-all" [class.opacity-40]="item.status === 'READY'" [class.line-through]="item.status === 'READY'">
-                      <div class="flex items-baseline justify-between">
-                        <span class="text-sm font-bold text-gray-800 dark:text-gray-200">
-                          {{ getProductName(item.productId) }}
-                        </span>
-                        <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400 shrink-0 ml-2">
-                          x{{ item.quantity }}
-                        </span>
-                      </div>
-                      
-                      @if (item.note) {
-                        <div class="text-[10px] text-purple-705 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/20 px-2 py-1 rounded">
-                          OBS: {{ item.note }}
+                  <!-- ITEMS LIST -->
+                  <div class="divide-y divide-gray-100 dark:divide-gray-700/60 space-y-3">
+                    @for (item of group.items; track item.id) {
+                      <div class="pt-2 flex flex-col gap-1.5 transition-all" [class.opacity-40]="item.status === 'READY'" [class.line-through]="item.status === 'READY'">
+                        <div class="flex items-baseline justify-between">
+                          <span class="text-sm font-bold text-gray-800 dark:text-gray-200">
+                            {{ getProductName(item.productId) }}
+                          </span>
+                          <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400 shrink-0 ml-2">
+                            x{{ item.quantity }}
+                          </span>
                         </div>
-                      }
-
-                      <!-- Item status/actions -->
-                      <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1">
-                        <span class="font-semibold">{{ getElapsedTimeText(item.id, item.createdAt) }}</span>
                         
-                        <!-- Status Badge or Action Button -->
-                        <div>
-                          @if (item.status === 'PENDING') {
-                            <button 
-                              (click)="startPrep(item.id)"
-                              class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
-                            >
-                              Empezar
-                            </button>
-                          } @else if (item.status === 'IN_PREPARATION') {
-                            <button 
-                              (click)="markReady(item.id)"
-                              class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
-                            >
-                              Listo
-                            </button>
-                          } @else {
-                            <span class="text-emerald-500 font-extrabold">✓ LISTO</span>
-                          }
+                        @if (item.note) {
+                          <div class="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/20 px-2 py-1 rounded">
+                            OBS: {{ item.note }}
+                          </div>
+                        }
+
+                        <!-- Item status/actions -->
+                        <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+                          <span class="font-semibold">{{ getElapsedTimeText(item.id, item.createdAt) }}</span>
+                          
+                          <!-- Status Badge or Action Button -->
+                          <div>
+                            @if (item.status === 'PENDING') {
+                              <button 
+                                (click)="startPrep(item.id)"
+                                class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
+                              >
+                                Empezar
+                              </button>
+                            } @else if (item.status === 'IN_PREPARATION') {
+                              <button 
+                                (click)="markReady(item.id)"
+                                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
+                              >
+                                Listo
+                              </button>
+                            } @else {
+                              <span class="text-emerald-500 font-extrabold">✓ LISTO</span>
+                            }
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  }
+                    }
+                  </div>
+
                 </div>
 
               </div>
+            }
+            @if (activeGroups().length === 0) {
+              <div class="col-span-full py-20 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+                <svg class="h-16 w-16 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <h3 class="font-extrabold text-lg">Cola Vacía</h3>
+                <p class="text-xs text-gray-500 mt-1">No hay comandas activas pendientes de preparación en la zona de {{ getActiveZoneName() }}.</p>
+              </div>
+            }
+          </div>
+        }
 
-            </div>
-          }
-          @if (groupedQueue().length === 0) {
-            <div class="col-span-full py-20 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
-              <svg class="h-16 w-16 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <h3 class="font-extrabold text-lg">Cola Vacía</h3>
-              <p class="text-xs text-gray-500 mt-1">No hay comandas activas pendientes de preparación en la zona de {{ getActiveZoneName() }}.</p>
-            </div>
-          }
-        </div>
+        <!-- Tab 2: Completed History -->
+        @if (currentTab() === 'history') {
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in duration-200">
+            @for (group of completedGroups(); track group.orderId + '-' + group.createdAt) {
+              <div 
+                [class]="getGroupUrgencyClass(group)"
+                class="rounded-2xl border-2 p-5 flex flex-col justify-between min-h-[220px] shadow-sm transition-all duration-300 relative"
+              >
+                
+                <!-- CARD HEADER -->
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center pb-2 border-b border-gray-150 dark:border-gray-700/50">
+                    <!-- TICKET ORIGIN -->
+                    <span class="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-400">
+                      {{ getOrderTypeLabel(group) }}
+                    </span>
+                    
+                    <!-- ID DE COMANDA -->
+                    <span class="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
+                      Pedido #{{ group.orderId }}
+                    </span>
+                  </div>
+
+                  <!-- ITEMS LIST -->
+                  <div class="divide-y divide-gray-100 dark:divide-gray-700/60 space-y-3">
+                    @for (item of group.items; track item.id) {
+                      <div class="pt-2 flex flex-col gap-1.5 transition-all opacity-60 line-through">
+                        <div class="flex items-baseline justify-between">
+                          <span class="text-sm font-bold text-gray-500 dark:text-gray-400">
+                            {{ getProductName(item.productId) }}
+                          </span>
+                          <span class="text-sm font-extrabold text-gray-400 shrink-0 ml-2">
+                            x{{ item.quantity }}
+                          </span>
+                        </div>
+                        
+                        @if (item.note) {
+                          <div class="text-[10px] text-gray-450 bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                            OBS: {{ item.note }}
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+
+                <!-- CARD FOOTER (Completion timestamp) -->
+                <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-[10px] text-emerald-500 font-bold">
+                  <span>✓ COMPLETO</span>
+                  <span class="text-gray-400 font-semibold">{{ getCompletionTimeText(group) }}</span>
+                </div>
+
+              </div>
+            }
+            @if (completedGroups().length === 0) {
+              <div class="col-span-full py-20 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+                <svg class="h-16 w-16 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <h3 class="font-extrabold text-lg">Historial Vacío</h3>
+                <p class="text-xs text-gray-500 mt-1">No se encontraron tickets completados en las últimas {{ historyHours() }} horas para la zona de {{ getActiveZoneName() }}.</p>
+              </div>
+            }
+          </div>
+        }
+
       } @else {
         <div class="py-20 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700">
           <p class="font-bold">Selecciona una zona de cocina para cargar el monitor.</p>
@@ -154,6 +269,10 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   public queue = signal<KitchenQueueItem[]>([]);
   public products = signal<Product[]>([]);
 
+  // Navigation tab and history duration setting
+  public currentTab = signal<'active' | 'history'>('active');
+  public historyHours = signal<number>(3);
+
   // Ticking time signal: maps itemId to elapsed seconds
   private elapsedSeconds = signal<Record<number, number>>({});
 
@@ -164,86 +283,122 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   private sessionItemsMap = new Map<number, KitchenQueueItem>();
   public localReadyItemIds = signal<Set<number>>(new Set<number>());
 
-  // Computed signal to group KDS items by comanda (orderId)
-  public groupedQueue = computed(() => {
+  // Computed signal to parse and group KDS items by comanda (orderId) and round (createdAt diff <= 5s)
+  public allGroups = computed(() => {
     const activeItems = this.queue();
     const readyIds = this.localReadyItemIds();
 
-    // 1. Gather active orders
-    const activeOrderIds = new Set<number>();
-    activeItems.forEach(item => {
-      activeOrderIds.add(item.orderId);
-      this.sessionItemsMap.set(item.id, item);
-    });
-
-    // Combine active items with cached ones that were marked ready
-    const combined: KitchenQueueItem[] = [];
-    const includedIds = new Set<number>();
-
-    activeItems.forEach(item => {
+    // Combine active items with local ready updates
+    const combined: KitchenQueueItem[] = activeItems.map(item => {
       if (readyIds.has(item.id)) {
-        combined.push({ ...item, status: 'READY' });
-      } else {
-        combined.push(item);
+        return { ...item, status: 'READY' as const };
       }
-      includedIds.add(item.id);
+      return item;
     });
 
-    this.sessionItemsMap.forEach(item => {
-      if (activeOrderIds.has(item.orderId) && !includedIds.has(item.id)) {
-        if (readyIds.has(item.id) || item.status === 'READY') {
-          combined.push({ ...item, status: 'READY' });
-          includedIds.add(item.id);
-        }
-      }
-    });
-
-    // 2. Group by orderId
-    const groupsMap = new Map<number, KitchenQueueItem[]>();
-    combined.forEach(item => {
-      if (!groupsMap.has(item.orderId)) {
-        groupsMap.set(item.orderId, []);
-      }
-      groupsMap.get(item.orderId)!.push(item);
-    });
-
-    // 3. Filter completed groups and format resource DTOs
-    const finalGroups: { orderId: number; tableNumber?: number; createdAt: string; items: KitchenQueueItem[] }[] = [];
+    // Group items by orderId and round (createdAt difference <= 5 seconds)
+    const groups: { orderId: number; tableNumber?: number; createdAt: string; items: KitchenQueueItem[] }[] = [];
     
-    groupsMap.forEach((items, orderId) => {
-      const allReady = items.every(item => item.status === 'READY' || readyIds.has(item.id));
-      if (!allReady) {
-        // Sort items: PENDING first, IN_PREPARATION second, READY last
-        const sortedItems = [...items].sort((a, b) => {
-          const statusOrder = { 'PENDING': 0, 'IN_PREPARATION': 1, 'READY': 2 };
-          return statusOrder[a.status] - statusOrder[b.status];
-        });
+    const orderItemsMap = new Map<number, KitchenQueueItem[]>();
+    combined.forEach(item => {
+      if (!orderItemsMap.has(item.orderId)) {
+        orderItemsMap.set(item.orderId, []);
+      }
+      orderItemsMap.get(item.orderId)!.push(item);
+    });
 
-        const first = items[0];
-        const minCreatedAt = items.reduce((min, it) => 
-          new Date(it.createdAt).getTime() < new Date(min).getTime() ? it.createdAt : min, 
-          first.createdAt
-        );
-
-        finalGroups.push({
-          orderId,
-          tableNumber: first.tableNumber,
-          createdAt: minCreatedAt,
-          items: sortedItems
-        });
-      } else {
-        // Clear finished comanda items from local caches
-        items.forEach(item => {
-          this.sessionItemsMap.delete(item.id);
-          if (readyIds.has(item.id)) {
-            readyIds.delete(item.id);
+    orderItemsMap.forEach((items, orderId) => {
+      const sorted = [...items].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      
+      let currentRound: KitchenQueueItem[] = [];
+      let prevTime: number | null = null;
+      
+      sorted.forEach(item => {
+        const itemTime = new Date(item.createdAt).getTime();
+        if (prevTime === null || (itemTime - prevTime) <= 5000) {
+          currentRound.push(item);
+        } else {
+          if (currentRound.length > 0) {
+            groups.push({
+              orderId,
+              tableNumber: currentRound[0].tableNumber,
+              createdAt: currentRound[0].createdAt,
+              items: currentRound
+            });
           }
+          currentRound = [item];
+        }
+        prevTime = itemTime;
+      });
+      
+      if (currentRound.length > 0) {
+        groups.push({
+          orderId,
+          tableNumber: currentRound[0].tableNumber,
+          createdAt: currentRound[0].createdAt,
+          items: currentRound
         });
       }
     });
 
-    // Sort by comanda timestamp oldest first (FIFO)
-    return finalGroups.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return groups;
+  });
+
+  // Active tickets computed (FIFO)
+  public activeGroups = computed(() => {
+    const groups = this.allGroups();
+    const readyIds = this.localReadyItemIds();
+    
+    const active = groups.filter(g => {
+      // It is active if at least one item is NOT ready
+      return g.items.some(item => item.status !== 'READY' && !readyIds.has(item.id));
+    });
+
+    // Sort items inside each active group (PENDING first, IN_PREPARATION next, READY last)
+    active.forEach(g => {
+      g.items.sort((a, b) => {
+        const statusOrder = { 'PENDING': 0, 'IN_PREPARATION': 1, 'READY': 2 };
+        return statusOrder[a.status] - statusOrder[b.status];
+      });
+    });
+
+    // Sort active tickets oldest first (FIFO)
+    return active.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  });
+
+  // Completed history tickets computed (LIFO - newest first)
+  public completedGroups = computed(() => {
+    const groups = this.allGroups();
+    const readyIds = this.localReadyItemIds();
+    const windowHours = this.historyHours();
+    const cutoffTime = Date.now() - (windowHours * 60 * 60 * 1000);
+
+    const completed = groups.filter(g => {
+      // It is completed if ALL items are ready
+      const allReady = g.items.every(item => item.status === 'READY' || readyIds.has(item.id));
+      if (!allReady) return false;
+
+      // Find completion time (max readyAt or max createdAt if readyAt is missing)
+      const compTime = g.items.reduce((max, item) => {
+        const t = item.readyAt ? new Date(item.readyAt).getTime() : new Date(item.createdAt).getTime();
+        return t > max ? t : max;
+      }, 0);
+
+      return compTime >= cutoffTime;
+    });
+
+    // Sort completed tickets newest first (LIFO)
+    return completed.sort((a, b) => {
+      const aTime = a.items.reduce((max, item) => {
+        const t = item.readyAt ? new Date(item.readyAt).getTime() : new Date(item.createdAt).getTime();
+        return t > max ? t : max;
+      }, 0);
+      const bTime = b.items.reduce((max, item) => {
+        const t = item.readyAt ? new Date(item.readyAt).getTime() : new Date(item.createdAt).getTime();
+        return t > max ? t : max;
+      }, 0);
+      return bTime - aTime;
+    });
   });
 
   constructor() {
@@ -324,18 +479,14 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
           const itemId = payload.itemId;
           const newStatus = payload.newStatus;
           
-          if (newStatus === 'READY' || newStatus === 'DELIVERED' || newStatus === 'CANCELLED') {
-            if (newStatus === 'READY') {
-              this.localReadyItemIds.update(set => {
-                const newSet = new Set(set);
-                newSet.add(itemId);
-                return newSet;
-              });
-              const cached = this.sessionItemsMap.get(itemId);
-              if (cached) {
-                this.sessionItemsMap.set(itemId, { ...cached, status: 'READY' });
-              }
-            }
+          if (newStatus === 'READY') {
+            this.localReadyItemIds.update(set => {
+              const newSet = new Set(set);
+              newSet.add(itemId);
+              return newSet;
+            });
+            this.queue.update(q => q.map(item => item.id === itemId ? { ...item, status: 'READY', readyAt: new Date().toISOString() } : item));
+          } else if (newStatus === 'DELIVERED' || newStatus === 'CANCELLED') {
             this.queue.update(q => q.filter(item => item.id !== itemId));
           } else {
             this.queue.update(q => q.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
@@ -372,7 +523,7 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   private updateTimers(): void {
     const newTimes: Record<number, number> = {};
     const now = Date.now();
-    this.sessionItemsMap.forEach(item => {
+    this.queue().forEach(item => {
       const elapsed = Math.floor((now - new Date(item.createdAt).getTime()) / 1000);
       newTimes[item.id] = Math.max(0, elapsed);
     });
@@ -391,6 +542,45 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   getProductName(productId: number): string {
     const prod = this.products().find(p => p.id === productId);
     return prod ? prod.name : `Plato #${productId}`;
+  }
+
+  getGroupUrgencyClass(group: any): string {
+    if (this.currentTab() === 'history') {
+      return 'border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-800/40 opacity-75';
+    }
+    
+    let highestUrgency: string = 'NORMAL';
+    group.items.forEach((item: any) => {
+      if (item.status !== 'READY') {
+        const urg = this.getUrgencyLevel(item);
+        if (urg === 'RED') highestUrgency = 'RED';
+        else if (urg === 'AMBER' && highestUrgency !== 'RED') highestUrgency = 'AMBER';
+      }
+    });
+
+    if (highestUrgency === 'RED') {
+      return 'border-red-500 dark:border-red-650 bg-red-55/10 dark:bg-red-950/5 animate-pulse';
+    } else if (highestUrgency === 'AMBER') {
+      return 'border-amber-500 dark:border-amber-600 bg-amber-50/10 dark:bg-amber-950/5';
+    }
+    return 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800';
+  }
+
+  getOrderTypeLabel(group: any): string {
+    const type = group.items[0]?.orderType || 'DINE_IN';
+    if (type === 'DELIVERY') return '🛵 Delivery';
+    if (type === 'TAKEAWAY') return '🛍️ Llevar';
+    return group.tableNumber ? `Mesa M${group.tableNumber}` : 'Salón';
+  }
+
+  getCompletionTimeText(group: any): string {
+    const maxTime = group.items.reduce((max: number, item: any) => {
+      const t = item.readyAt ? new Date(item.readyAt).getTime() : new Date(item.createdAt).getTime();
+      return t > max ? t : max;
+    }, 0);
+    if (!maxTime) return 'Completado';
+    const date = new Date(maxTime);
+    return 'Listo a las ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   public getUrgencyLevel(item: KitchenQueueItem): 'NORMAL' | 'AMBER' | 'RED' {

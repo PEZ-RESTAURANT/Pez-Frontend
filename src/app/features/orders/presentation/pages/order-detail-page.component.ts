@@ -78,12 +78,16 @@ export interface CartLine {
           </button>
           <div>
             <h3 class="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
-              <span>Mesa M{{ tableNumber() }}</span>
+              <span *ngIf="!isDeliveryMode">Mesa M{{ tableNumber() }}</span>
+              <span *ngIf="isDeliveryMode">🛵 Pedido Delivery</span>
               <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-bold uppercase tracking-wider">
                 Comandando
               </span>
             </h3>
-            <p class="text-xs text-gray-400 mt-0.5">{{ zoneTag() }} - Piso {{ floor() }}</p>
+            <p class="text-xs text-gray-400 mt-0.5">
+              <span *ngIf="!isDeliveryMode">{{ zoneTag() }} - Piso {{ floor() }}</span>
+              <span *ngIf="isDeliveryMode">Motorizado / Envio Domicilio</span>
+            </p>
           </div>
         </div>
 
@@ -320,8 +324,8 @@ export interface CartLine {
               }
             </div>
 
-            <!-- LOYALTY SEARCH -->
-            <div class="bg-gray-50 dark:bg-gray-900/60 p-4 rounded-xl border border-gray-100 dark:border-gray-800 space-y-3">
+            <!-- LOYALTY SEARCH (Salón) -->
+            <div *ngIf="!isDeliveryMode" class="bg-gray-50 dark:bg-gray-900/60 p-4 rounded-xl border border-gray-100 dark:border-gray-800 space-y-3">
               <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cliente de Fidelización</label>
               
               <div class="flex gap-2">
@@ -347,6 +351,87 @@ export interface CartLine {
               }
             </div>
 
+            <!-- DATOS DE DELIVERY -->
+            <div *ngIf="isDeliveryMode" class="bg-indigo-50/40 dark:bg-gray-900/60 p-4 rounded-xl border border-indigo-100/60 dark:border-gray-800 space-y-4">
+              <h4 class="text-xs font-black uppercase text-indigo-700 dark:text-indigo-400 tracking-wider">Datos de Entrega</h4>
+              
+              <!-- Teléfono y Buscar -->
+              <div class="space-y-1">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase">Teléfono del Cliente *</label>
+                <div class="flex gap-2">
+                  <input 
+                    type="text" 
+                    [(ngModel)]="deliveryCustomerPhone"
+                    [disabled]="!isDeliveryFieldsEditable()"
+                    placeholder="Ingresa teléfono..." 
+                    class="flex-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none font-bold"
+                  />
+                  <button 
+                    type="button"
+                    (click)="searchDeliveryCustomer()"
+                    [disabled]="!isDeliveryFieldsEditable()"
+                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg cursor-pointer transition-colors"
+                  >
+                    Buscar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Nombre del Cliente -->
+              <div class="space-y-1">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase">Nombre del Cliente *</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="deliveryCustomerName"
+                  [disabled]="!isDeliveryFieldsEditable()"
+                  placeholder="Nombre completo..." 
+                  class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none font-bold"
+                />
+                <span *ngIf="loyaltyCustomer()" class="text-[9px] text-emerald-600 font-extrabold uppercase mt-0.5 block">
+                  🌟 Cliente Afiliado ({{ loyaltyCustomer()?.pointsBalance }} pts)
+                </span>
+              </div>
+
+              <!-- Dirección -->
+              <div class="space-y-1">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase">Dirección de Entrega *</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="deliveryAddress"
+                  [disabled]="!isDeliveryFieldsEditable()"
+                  placeholder="Dirección exacta..." 
+                  class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none font-bold"
+                />
+              </div>
+
+              <!-- Ubicación Link -->
+              <div class="space-y-1">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase">Link de Ubicación (Maps - Opcional)</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="deliveryMapsLink"
+                  [disabled]="!isDeliveryFieldsEditable()"
+                  placeholder="https://maps.google.com/?q=..." 
+                  class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none font-bold animate-in fade-in"
+                />
+              </div>
+
+              <!-- Pago Declarado -->
+              <div class="space-y-1">
+                <label class="block text-[10px] font-bold text-gray-400 uppercase">Método de Pago Declarado *</label>
+                <select appSelect
+                  [(ngModel)]="declaredPaymentMethod"
+                  [disabled]="!isDeliveryFieldsEditable()"
+                  class="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 font-bold text-xs text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+                  <option value="">-- Selecciona método --</option>
+                  @for (opt of paymentMethodsOptions(); track opt.id) {
+                    <option [value]="opt.type">{{ opt.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+
             <!-- TOTALS -->
             <div class="border-t border-gray-100 dark:border-gray-700/60 pt-4 space-y-2 text-xs font-semibold">
               <div class="flex justify-between text-gray-400">
@@ -362,7 +447,7 @@ export interface CartLine {
             <!-- SEND BUTTON -->
             <button 
               (click)="sendToKitchen()"
-              [disabled]="cart().length === 0"
+              [disabled]="isSendDisabled()"
               class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none text-white font-bold text-sm rounded-xl cursor-pointer shadow-md transition-all uppercase tracking-wider flex items-center justify-center gap-2"
             >
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -370,6 +455,9 @@ export interface CartLine {
               </svg>
               Enviar a Cocina
             </button>
+            <p *ngIf="isDeliveryMode && isSendDisabled() && cart().length > 0" class="text-[10px] text-red-500 font-bold text-center mt-2 animate-pulse">
+              * Completa todos los campos obligatorios (*) para enviar a cocina.
+            </p>
           </div>
         </div>
 
@@ -640,6 +728,16 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   public selectedCategory = signal<string>('ALL');
   public searchTerm = signal<string>('');
 
+  // Delivery state properties
+  public isDeliveryMode = false;
+  public activeOrderId: number | null = null;
+  public deliveryCustomerName = '';
+  public deliveryCustomerPhone = '';
+  public deliveryAddress = '';
+  public deliveryMapsLink = '';
+  public declaredPaymentMethod = '';
+  public paymentMethodsOptions = signal<any[]>([]);
+
   // Cart and Modal State
   public cart = signal<CartLine[]>([]);
   public addModalOpen = signal<boolean>(false);
@@ -687,6 +785,25 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
         this.cancelledItems.set([]);
       }
     });
+
+    // Monitor activeOrder() to sync delivery details in delivery mode
+    effect(() => {
+      const order = this.activeOrder();
+      if (order && this.isDeliveryMode) {
+        this.deliveryCustomerName = order.deliveryCustomerName || '';
+        this.deliveryCustomerPhone = order.deliveryCustomerPhone || '';
+        this.deliveryAddress = order.deliveryAddress || '';
+        this.deliveryMapsLink = order.deliveryMapsLink || '';
+        this.declaredPaymentMethod = order.declaredPaymentMethod || '';
+        if (order.customerId) {
+          this.loyaltyCustomer.set({
+            id: order.customerId,
+            fullName: order.deliveryCustomerName || 'Cliente de Fidelización',
+            pointsBalance: 0
+          });
+        }
+      }
+    });
   }
 
   private lockRefreshInterval?: any;
@@ -702,11 +819,38 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       next: (zs) => this.kitchenZones.set(zs)
     });
 
+    // Cargar métodos de pago activos para el declaredPaymentMethod
+    this.cashApi.getActivePaymentMethods().subscribe({
+      next: (methods) => {
+        this.paymentMethodsOptions.set(methods);
+      },
+      error: () => {
+        this.paymentMethodsOptions.set([
+          { id: 1, type: 'CASH', name: 'Efectivo' },
+          { id: 2, type: 'CARD', name: 'Tarjeta' },
+          { id: 3, type: 'YAPE', name: 'Yape' },
+          { id: 4, type: 'PLIN', name: 'Plin' },
+          { id: 5, type: 'TRANSFER', name: 'Transferencia' }
+        ]);
+      }
+    });
+
     // 1. Resolver ID de Mesa desde la URL
     this.route.paramMap.subscribe(params => {
       const idStr = params.get('tableId');
       if (idStr) {
-        this.tableId = parseInt(idStr, 10);
+        if (idStr === 'delivery') {
+          this.isDeliveryMode = true;
+          this.tableId = 0;
+          this.activeOrderId = null;
+        } else if (idStr.startsWith('delivery-')) {
+          this.isDeliveryMode = true;
+          this.tableId = 0;
+          this.activeOrderId = Number(idStr.split('-')[1]);
+        } else {
+          this.isDeliveryMode = false;
+          this.tableId = parseInt(idStr, 10);
+        }
         
         // Cargar productos del catálogo
         this.api.getProducts().subscribe({
@@ -720,8 +864,10 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
           error: () => this.notify.error('No se pudo cargar la lista de categorías.')
         });
 
-        // 2. Iniciar timer de lock refresco cada 90 segundos
-        this.startLockRefreshTimer();
+        // 2. Iniciar timer de lock refresco cada 90 segundos si es salón
+        if (!this.isDeliveryMode) {
+          this.startLockRefreshTimer();
+        }
       }
     });
 
@@ -745,7 +891,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     // Si la pestaña se oculta (visibilityState === 'hidden') o el evento es pagehide, liberamos de inmediato
     if (document.visibilityState === 'hidden' || event.type === 'pagehide') {
       const token = this.session.getToken();
-      if (token && this.tableId) {
+      if (token && this.tableId && !this.isDeliveryMode) {
         const cleanUrl = (environment.serverBaseUrl || 'http://localhost:8080/api/v1').replace(/\/api\/v1\/?$/, '');
         const url = `${cleanUrl}/api/v1/tables/${this.tableId}/unlock`;
         
@@ -782,6 +928,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   // PROPIEDADES DE LA MESA CORRIENTE
   tableNumber = computed(() => {
+    if (this.isDeliveryMode) return 0;
     const table = this.ordersService.tables$().find(t => t.id === this.tableId);
     return table ? table.number : 0;
   });
@@ -816,8 +963,45 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   // ACTIVE COMANDA/ORDER (TURN CONSUMPTION)
   activeOrder = computed(() => {
+    if (this.isDeliveryMode && this.activeOrderId) {
+      return this.ordersService.orders$().find(o => o.id === this.activeOrderId);
+    }
     return this.ordersService.orders$().find(o => o.tableId === this.tableId && ACTIVE_ORDER_STATUSES.includes(o.status));
   });
+
+  searchDeliveryCustomer(): void {
+    const phone = this.deliveryCustomerPhone.trim();
+    if (!phone) return;
+    this.loyaltyApi.getCustomerByPhone(phone).subscribe({
+      next: (cust) => {
+        this.loyaltyCustomer.set(cust);
+        this.deliveryCustomerName = cust.fullName;
+        this.notify.success(`Cliente ${cust.fullName} vinculado.`);
+      },
+      error: () => {
+        this.loyaltyCustomer.set(null);
+        this.notify.info('Cliente no afiliado. Registrando teléfono para esta compra.');
+      }
+    });
+  }
+
+  isSendDisabled(): boolean {
+    if (this.cart().length === 0) return true;
+    if (this.isDeliveryMode) {
+      const nameOk = !!(this.deliveryCustomerName && this.deliveryCustomerName.trim());
+      const phoneOk = !!(this.deliveryCustomerPhone && this.deliveryCustomerPhone.trim());
+      const addressOk = !!(this.deliveryAddress && this.deliveryAddress.trim());
+      const methodOk = !!this.declaredPaymentMethod;
+      return !(nameOk && phoneOk && addressOk && methodOk);
+    }
+    return false;
+  }
+
+  isDeliveryFieldsEditable(): boolean {
+    const order = this.activeOrder();
+    if (!order) return true;
+    return order.status === 'TAKING_ORDER';
+  }
 
   getProductName(productId: number): string {
     const p = this.products().find(prod => prod.id === productId);
@@ -995,16 +1179,35 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     const customerId = this.loyaltyCustomer()?.id || undefined;
 
     // Lógica secuencial:
-    // 1. Si no hay comanda activa para esta mesa, primero creamos la comanda
+    // 1. Si no hay comanda activa para esta mesa/delivery, primero creamos la comanda
     const active = this.activeOrder();
     
     if (!active) {
-      this.api.createOrder(this.tableId, 'DINE_IN', customerId).subscribe({
-        next: (newOrder) => {
-          this.addItemsSequentially(newOrder.id, lines, waiterId);
-        },
-        error: () => this.notify.error('No se pudo inicializar la comanda en cocina.')
-      });
+      if (this.isDeliveryMode) {
+        this.api.createOrder(
+          null,
+          'DELIVERY',
+          customerId,
+          this.deliveryCustomerName.trim(),
+          this.deliveryCustomerPhone.trim(),
+          this.deliveryAddress.trim(),
+          this.deliveryMapsLink.trim(),
+          this.declaredPaymentMethod
+        ).subscribe({
+          next: (newOrder) => {
+            this.activeOrderId = newOrder.id;
+            this.addItemsSequentially(newOrder.id, lines, waiterId);
+          },
+          error: (err) => this.notify.error(err.error?.message || 'No se pudo inicializar la comanda delivery.')
+        });
+      } else {
+        this.api.createOrder(this.tableId, 'DINE_IN', customerId).subscribe({
+          next: (newOrder) => {
+            this.addItemsSequentially(newOrder.id, lines, waiterId);
+          },
+          error: () => this.notify.error('No se pudo inicializar la comanda en cocina.')
+        });
+      }
     } else {
       this.addItemsSequentially(active.id, lines, waiterId);
     }
@@ -1043,6 +1246,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   closeKitchenSuccessModal(): void {
     this.kitchenSuccessModalOpen.set(false);
+    if (this.isDeliveryMode) {
+      this.router.navigate(['/app/orders']);
+    }
   }
 
   // PRINTING AND RECEIPT ACTIONS
@@ -1261,8 +1467,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     // 2. Remover listeners del navegador
     this.unregisterVisibilityListeners();
 
-    // 3. Liberar la mesa
-    if (this.tableId) {
+    // 3. Liberar la mesa si no es delivery
+    if (this.tableId && !this.isDeliveryMode) {
       this.api.unlockTable(this.tableId).subscribe();
     }
   }

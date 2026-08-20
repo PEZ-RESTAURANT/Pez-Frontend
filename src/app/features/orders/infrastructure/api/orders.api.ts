@@ -46,11 +46,25 @@ export class OrdersApi extends BaseApiService {
     return this.http.get<OrderItem[]>(`${this.baseUrl}/orders/queue/kitchen`, { params });
   }
 
-  createOrder(tableId: number, type: string, customerId?: number): Observable<Order> {
+  createOrder(
+    tableId: number | null,
+    type: string,
+    customerId?: number,
+    deliveryCustomerName?: string,
+    deliveryCustomerPhone?: string,
+    deliveryAddress?: string,
+    deliveryMapsLink?: string,
+    declaredPaymentMethod?: string
+  ): Observable<Order> {
     return this.http.post<Order>(`${this.baseUrl}/orders`, {
       tableId,
       type,
-      customerId
+      customerId,
+      deliveryCustomerName,
+      deliveryCustomerPhone,
+      deliveryAddress,
+      deliveryMapsLink,
+      declaredPaymentMethod
     });
   }
 

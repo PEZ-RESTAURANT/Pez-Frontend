@@ -92,7 +92,7 @@ export class OrdersService implements OnDestroy {
     });
   }
 
-  createOrder(tableId: number, type: string, customerId?: number): void {
+  createOrder(tableId: number | null, type: string, customerId?: number): void {
     this.api.createOrder(tableId, type, customerId).pipe(
       tap((newOrder) => {
         this._orders.update((current) => [...current, newOrder]);

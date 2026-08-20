@@ -132,6 +132,13 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
                 Piso {{ f }}
               </button>
             }
+            <button 
+              *ngIf="canCreateDelivery()"
+              (click)="goToDeliveryCreation()"
+              class="px-3.5 py-1.5 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1"
+            >
+              🛵 Delivery
+            </button>
           </div>
 
           <!-- Controles de Zoom -->
@@ -260,57 +267,79 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
       <!-- VISTA CARDS (PEDIDOS ACTIVOS) -->
       <div *ngIf="viewMode() === 'cards'" class="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 animate-in fade-in duration-200">
-        @for (table of activeTables(); track table.id) {
+        @for (card of activeCards(); track (card.isTable ? 't-' + card.id : 'o-' + card.id)) {
           <div 
-            (click)="onTableClick(table)"
+            (click)="onCardClick(card)"
             class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-md p-6 hover:shadow-lg transition-all duration-300 cursor-pointer hover:-translate-y-1 relative"
           >
             <div class="flex justify-between items-start mb-4">
               <div>
-                <span class="text-2xl font-black text-gray-900 dark:text-white">Mesa {{ table.number }}</span>
-                <span class="text-xs text-gray-400 block mt-0.5 uppercase">{{ table.zoneTag || 'Salón' }}</span>
-                @if (getTableReservation(table.id); as res) {
+                @if (card.isTable) {
+                  <span class="text-2xl font-black text-gray-900 dark:text-white">Mesa M{{ card.number }}</span>
+                  <span class="text-xs text-gray-400 block mt-0.5 uppercase">{{ card.zoneTag || 'Salón' }}</span>
+                } @else {
+                  <span class="text-2xl font-black text-blue-600 dark:text-blue-400">Delivery #{{ card.orderId }}</span>
+                  <span class="text-xs text-gray-400 block mt-0.5 uppercase">Motorizado</span>
+                  <span class="text-xs font-bold text-gray-800 dark:text-gray-200 block mt-1.5 truncate max-w-[200px]" [title]="card.customerName">
+                     👤 {{ card.customerName }}
+                  </span>
+                  <span class="text-[10px] text-gray-400 block mt-0.5 truncate max-w-[200px]" [title]="card.address">
+                     📍 {{ card.address }}
+                  </span>
+                }
+                
+                @if (card.isTable && getTableReservation(card.id); as res) {
                   <span class="mt-1 inline-block px-2 py-0.5 bg-yellow-100 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-400 text-[9px] font-black uppercase rounded">
                     📅 {{ res.reservationDateTime | date:'HH:mm' }} - {{ res.customerName }}
                   </span>
                 }
-                @if (isTableAttentionDelayed(table) || isTableDishesDelayed(table)) {
+                @if (card.isTable && (isTableAttentionDelayed(card) || isTableDishesDelayed(card))) {
                   <span class="mt-1 inline-block px-2 py-0.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[9px] font-black uppercase rounded animate-pulse">
-                    ⚠️ RETRASO (+{{ getTableDelayMinutes(table) }} min)
+                    ⚠️ RETRASO (+{{ getTableDelayMinutes(card) }} min)
                   </span>
                 }
-                @if (hasReadyItems(table.id)) {
+                @if (!card.isTable && isDeliveryOrderDelayed(card)) {
+                  <span class="mt-1 inline-block px-2 py-0.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[9px] font-black uppercase rounded animate-pulse">
+                    ⚠️ RETRASO (+{{ getDeliveryDelayMinutes(card) }} min)
+                  </span>
+                }
+                @if (hasReadyItems(card.isTable ? card.id : null, card.isTable ? null : card.orderId)) {
                   <span class="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 text-[10px] font-black uppercase rounded-lg animate-bounce">
-                    🔔 Plato Listo para Entregar
+                    🔔 Plato Listo
                   </span>
                 }
               </div>
-              <span [ngClass]="getStatusBadgeClasses(table.status)" class="text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider animate-in">
-                {{ getStatusText(table) }}
+              <span [ngClass]="getStatusBadgeClasses(card.status)" class="text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider animate-in">
+                {{ getStatusTextLabel(card.status) }}
               </span>
             </div>
 
-            <!-- Lock Info -->
+            <!-- Bottom info: Lock info or payments info -->
             <div class="flex items-center justify-between text-xs border-t border-gray-150 dark:border-gray-700/60 pt-4 mt-2">
-              <span class="text-gray-400 font-medium">Estado del Lock:</span>
-              @if (isTableLocked(table.id)) {
-                <span class="text-red-650 dark:text-red-400 font-bold flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                  En uso por {{ getLockWaiter(table.id) }}
-                </span>
+              @if (card.isTable) {
+                <span class="text-gray-400 font-medium">Estado del Lock:</span>
+                @if (isTableLocked(card.id)) {
+                  <span class="text-red-650 dark:text-red-400 font-bold flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                    En uso por {{ getLockWaiter(card.id) }}
+                  </span>
+                } @else {
+                  <span class="text-emerald-600 dark:text-emerald-400 font-bold">Disponible</span>
+                }
               } @else {
-                <span class="text-emerald-600 dark:text-emerald-400 font-bold">Disponible</span>
+                <span class="text-gray-400 font-medium">Pago Declarado:</span>
+                <span class="text-indigo-600 dark:text-indigo-400 font-extrabold uppercase">{{ getPaymentMethodLabel(card.declaredPaymentMethod) }}</span>
               }
             </div>
 
             <!-- Botón Cobrar si está en ALL_DELIVERED o ISSUED_UNPAID y rol es ADMIN/CASHIER -->
             <div 
-              *ngIf="(table.status === 'ALL_DELIVERED' || table.status === 'ISSUED_UNPAID') && canCollectPayment()"
+              *ngIf="(card.status === 'ALL_DELIVERED' || card.status === 'ISSUED_UNPAID') && canCollectPayment()"
               class="mt-4 pt-3 border-t border-gray-150 dark:border-gray-700/60 flex justify-end"
               (click)="$event.stopPropagation()"
             >
               <button 
-                (click)="onCollectPaymentClick($event, table)"
+                (click)="onCollectPaymentCardClick($event, card)"
                 class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider text-center"
               >
                 Cobrar Cuenta
@@ -318,13 +347,13 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
             </div>
           </div>
         }
-        @if (activeTables().length === 0) {
+        @if (activeCards().length === 0) {
           <div class="col-span-full py-16 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
             <svg class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <p class="font-semibold">No hay comensales ni pedidos activos en este momento.</p>
-            <p class="text-xs text-gray-500 mt-1">Cambia a modo Mapa para abrir una nueva mesa.</p>
+            <p class="text-xs text-gray-500 mt-1">Cambia a modo Mapa para abrir una nueva mesa o haz un Delivery.</p>
           </div>
         }
       </div>
@@ -541,8 +570,13 @@ export class OrdersPageComponent implements OnInit {
     return this.ordersService.orders$().find(o => o.tableId === tableId && ACTIVE_ORDER_STATUSES.includes(o.status));
   }
 
-  hasReadyItems(tableId: number): boolean {
-    const order = this.getTableActiveOrder(tableId);
+  hasReadyItems(tableId: number | null, orderId?: number | null): boolean {
+    let order: Order | undefined;
+    if (orderId) {
+      order = this.ordersService.orders$().find(o => o.id === orderId);
+    } else if (tableId) {
+      order = this.getTableActiveOrder(tableId);
+    }
     if (!order) return false;
     return order.items.some(item => item.status === 'READY');
   }
@@ -599,9 +633,116 @@ export class OrdersPageComponent implements OnInit {
     return this.ordersService.tables$().filter(t => t.status !== 'FREE');
   });
 
+  public activeCards = computed(() => {
+    const tables = this.ordersService.tables$().filter(t => t.status !== 'FREE');
+    const deliveryOrders = this.ordersService.orders$().filter(o => o.type === 'DELIVERY' && ACTIVE_ORDER_STATUSES.includes(o.status));
+    
+    const cards: any[] = [];
+    tables.forEach(t => {
+      cards.push({
+        isTable: true,
+        id: t.id,
+        number: t.number,
+        floor: t.floor,
+        zoneTag: t.zoneTag,
+        status: t.status,
+        anchorTableId: t.anchorTableId
+      });
+    });
+    
+    deliveryOrders.forEach(o => {
+      cards.push({
+        isTable: false,
+        id: o.id,
+        orderId: o.id,
+        customerName: o.deliveryCustomerName || 'Público General',
+        customerPhone: o.deliveryCustomerPhone,
+        address: o.deliveryAddress,
+        status: o.status,
+        declaredPaymentMethod: o.declaredPaymentMethod
+      });
+    });
+    
+    return cards;
+  });
+
   public freeTables = computed(() => {
     return this.ordersService.tables$().filter(t => t.status === 'FREE' && !t.anchorTableId);
   });
+
+  public canCreateDelivery = computed(() => {
+    const user = this.session.currentUser$();
+    if (!user) return false;
+    return user.roles.includes('WAITER') || user.roles.includes('CASHIER') || user.roles.includes('ADMIN');
+  });
+
+  goToDeliveryCreation(): void {
+    this.router.navigate(['/app/orders', 'delivery']);
+  }
+
+  isDeliveryOrderDelayed(card: any): boolean {
+    const cfg = this.opConfig();
+    if (!cfg) return false;
+    const order = this.ordersService.orders$().find(o => o.id === card.orderId);
+    if (!order) return false;
+    const diffMs = new Date().getTime() - new Date(order.createdAt).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    return diffMin >= cfg.waitingDishesThresholdMinutes;
+  }
+
+  getDeliveryDelayMinutes(card: any): number {
+    const order = this.ordersService.orders$().find(o => o.id === card.orderId);
+    if (!order) return 0;
+    const diffMs = new Date().getTime() - new Date(order.createdAt).getTime();
+    return Math.floor(diffMs / 60000);
+  }
+
+  getStatusTextLabel(status: string): string {
+    switch (status) {
+      case 'FREE': return 'Libre';
+      case 'UNATTENDED': return 'Cola';
+      case 'TAKING_ORDER': return 'Comanda';
+      case 'WAITING_DISHES': return 'Cocina';
+      case 'ALL_DELIVERED': return 'Entrega';
+      case 'ISSUED_UNPAID': return 'Precuenta';
+      case 'PAID': return 'Pagado';
+      default: return status;
+    }
+  }
+
+  getPaymentMethodLabel(method: string | undefined): string {
+    if (!method) return 'Sin Definir';
+    switch (method) {
+      case 'CASH': return 'Efectivo';
+      case 'CARD': return 'Tarjeta';
+      case 'YAPE': return 'Yape';
+      case 'PLIN': return 'Plin';
+      case 'TRANSFER': return 'Transferencia';
+      default: return method;
+    }
+  }
+
+  onCollectPaymentCardClick(event: MouseEvent, card: any): void {
+    event.stopPropagation();
+    const order = this.ordersService.orders$().find(o => o.id === card.orderId);
+    if (!order) {
+      this.notify.error('No se encontró una comanda activa para cobrar.');
+      return;
+    }
+    this.selectedOrderForBilling.set(order);
+    this.isBillingModalOpen.set(true);
+  }
+
+  onCardClick(card: any): void {
+    if (card.isTable) {
+      const table = this.ordersService.tables$().find(t => t.id === card.id);
+      if (table) {
+        this.onTableClick(table);
+      }
+    } else {
+      this.router.navigate(['/app/orders', 'delivery-' + card.orderId]);
+    }
+  }
 
   // LOCK UTILITIES
   isTableLocked(tableId: number): boolean {

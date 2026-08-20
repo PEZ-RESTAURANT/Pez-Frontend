@@ -39,6 +39,11 @@ export interface Order {
   createdAt: string;
   items: OrderItem[];
   priceAdjustments: PriceAdjustment[];
+  deliveryCustomerName?: string;
+  deliveryCustomerPhone?: string;
+  deliveryAddress?: string;
+  deliveryMapsLink?: string;
+  declaredPaymentMethod?: string;
 }
 
 export interface RestaurantTable {

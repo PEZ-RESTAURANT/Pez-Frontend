@@ -22,7 +22,9 @@ export interface KitchenQueueItem {
   note: string;
   status: 'PENDING' | 'IN_PREPARATION' | 'READY';
   createdAt: string;
-  tableNumber?: number; // Devolución directa del DTO del backend
+  tableNumber?: number;
+  readyAt?: string;
+  orderType?: string;
 }
 
 @Injectable({ providedIn: 'root' })
