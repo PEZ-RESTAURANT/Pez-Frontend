@@ -14,13 +14,14 @@ import {
 import { NotificationService } from '../../../../core/services/notification.service';
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
-import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 
 @Component({
   selector: 'app-staff-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, SelectOnFocusDirective],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectOnFocusDirective, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
 
@@ -482,7 +483,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
         @if (!profileModalEditMode()) {
           <div>
             <label class="block text-xs font-black uppercase text-gray-400 mb-1">Cuenta del Colaborador</label>
-            <select 
+            <select appSelect
               [(ngModel)]="profileForm.accountId"
               name="profAccount"
               required
@@ -501,7 +502,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
         <!-- Payment Type -->
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Tipo de Liquidación / Pago</label>
-          <select 
+          <select appSelect
             [(ngModel)]="profileForm.paymentType"
             name="profPaymentType"
             required
@@ -599,7 +600,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
         <!-- Adjustment Type -->
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Tipo de Ajuste</label>
-          <select 
+          <select appSelect
             [(ngModel)]="adjustmentForm.type"
             name="adjType"
             required
@@ -666,7 +667,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
         <!-- Sanction Type -->
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Gravedad / Tipo de Falta</label>
-          <select 
+          <select appSelect
             [(ngModel)]="sanctionForm.type"
             name="sancType"
             required

@@ -31,4 +31,12 @@ export class AuthApi extends BaseApiService {
       newPassword
     });
   }
+
+  onboardRestaurant(data: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/restaurants/onboarding`, data);
+  }
+
+  getRestaurant(id: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/restaurants/${id}`);
+  }
 }

@@ -8,11 +8,12 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
 import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 @Component({
   selector: 'app-catalog-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, SelectOnFocusDirective],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectOnFocusDirective, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
 
@@ -191,7 +192,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
 
                       <div>
                         <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Categoría</label>
-                        <select 
+                        <select appSelect
                           [ngModel]="productEditCategoryId()"
                           (ngModelChange)="productEditCategoryId.set(toNumberOrNull($event))"
                           name="prodCategory"
@@ -207,7 +208,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
 
                       <div>
                         <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Estación de Cocina</label>
-                        <select 
+                        <select appSelect
                           [ngModel]="selectedProductKitchenZoneId()"
                           (ngModelChange)="selectedProductKitchenZoneId.set($event)"
                           name="prodKitchenZone"
@@ -292,7 +293,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
                                   min="0.0001"
                                   [(ngModel)]="item.quantityUsed"
                                   (change)="updateRecipeItemQty(item)"
-                                  class="w-20 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-lg text-right font-black"
+                                  class="w-28 pr-7 pl-2 py-1 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-lg text-right font-black"
                                 />
                                 <span class="text-gray-500 text-[10px] w-6 text-left">{{ item.supplyUnit || 'u' }}</span>
                                 <button 
@@ -324,7 +325,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
                         <div class="p-3 bg-gray-50 dark:bg-gray-900/30 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl space-y-3">
                           <span class="block text-[10px] font-black uppercase text-gray-400">Añadir Insumo a Receta</span>
                           <div class="flex flex-col sm:flex-row gap-2">
-                            <select 
+                            <select appSelect
                               [ngModel]="recipeFormSupplyId()"
                               (ngModelChange)="recipeFormSupplyId.set(toNumberOrNull($event))"
                               name="recipeSupplySelect"
@@ -346,7 +347,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
                                 (ngModelChange)="recipeFormQuantityUsed.set(toNumber($event))"
                                 name="recipeQtyInput"
                                 placeholder="Cant."
-                                class="w-20 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-xl font-bold text-xs text-right text-gray-900 dark:text-white"
+                                class="w-32 pr-7 pl-2 py-2 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded-xl font-black text-xs text-gray-900 dark:text-white text-right focus:outline-none"
                               />
                               <button 
                                 type="button"
@@ -456,7 +457,7 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
 
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Categoría</label>
-          <select 
+          <select appSelect
             [ngModel]="productCreateCategoryId()"
             (ngModelChange)="productCreateCategoryId.set(toNumberOrNull($event))"
             name="pNewCategory"

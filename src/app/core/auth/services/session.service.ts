@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 
 export interface UserSession {
   id: number;
@@ -19,6 +19,10 @@ export class SessionService {
   // Readonly signals using the $ suffix
   public currentUser$ = this._currentUser.asReadonly();
   public isAuthenticated$ = this._isAuthenticated.asReadonly();
+  public restaurantName$ = computed(() => {
+    this._isAuthenticated();
+    return this.getRestaurantName() || '';
+  });
 
   constructor() {
     this.restoreSession();
@@ -48,6 +52,17 @@ export class SessionService {
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
       return payload.restaurantId || null;
+    } catch {
+      return null;
+    }
+  }
+
+  getRestaurantName(): string | null {
+    const token = this.getToken();
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.restaurantName || null;
     } catch {
       return null;
     }

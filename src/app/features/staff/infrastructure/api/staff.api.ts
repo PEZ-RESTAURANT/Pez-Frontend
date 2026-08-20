@@ -200,4 +200,25 @@ export class StaffApi extends BaseApiService {
   getPaymentSummary(id: number): Observable<PaymentSummary> {
     return this.http.get<PaymentSummary>(`${this.baseUrl}/staff/profiles/${id}/payment-summary`);
   }
+
+  // --- STAFF INVITES MAPPINGS ---
+  generateStaffInvite(role: string, email: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/staff/invites`, { requestedRole: role, email: email });
+  }
+
+  getStaffInvites(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/staff/invites`);
+  }
+
+  revokeStaffInvite(code: string): Observable<any> {
+    return this.http.delete<any>(`${this.baseUrl}/staff/invites/${code}`);
+  }
+
+  verifyStaffInvite(code: string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/staff/invites/${code}`);
+  }
+
+  acceptStaffInvite(code: string, payload: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/staff/invites/${code}/accept`, payload);
+  }
 }

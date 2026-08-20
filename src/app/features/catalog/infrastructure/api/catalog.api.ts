@@ -23,6 +23,8 @@ export interface Supply {
   unit?: string;
   currentStock: number;
   minThreshold: number;
+  criticalThreshold?: number;
+  stockLevel?: string;
 }
 
 export interface RecipeItem {
@@ -97,12 +99,12 @@ export class CatalogApi extends BaseApiService {
     return this.http.get<Supply[]>(`${this.baseUrl}/supplies`);
   }
 
-  createSupply(name: string, unit: string, minThreshold: number): Observable<Supply> {
-    return this.http.post<Supply>(`${this.baseUrl}/supplies`, { name, unit, minThreshold });
+  createSupply(name: string, unit: string, minThreshold: number, criticalThreshold?: number): Observable<Supply> {
+    return this.http.post<Supply>(`${this.baseUrl}/supplies`, { name, unit, minThreshold, criticalThreshold });
   }
 
-  updateSupply(id: number, name: string, unit: string, minThreshold: number): Observable<Supply> {
-    return this.http.put<Supply>(`${this.baseUrl}/supplies/${id}`, { name, unit, minThreshold });
+  updateSupply(id: number, name: string, unit: string, minThreshold: number, criticalThreshold?: number): Observable<Supply> {
+    return this.http.put<Supply>(`${this.baseUrl}/supplies/${id}`, { name, unit, minThreshold, criticalThreshold });
   }
 
   deleteSupply(id: number): Observable<void> {

@@ -6,6 +6,12 @@ import { Product } from '../../../orders/domain/models/orders.model';
 export interface KitchenZone {
   id: number;
   name: string;
+  printingEnabled: boolean;
+}
+
+export interface PrintStation {
+  id: number;
+  name: string;
 }
 
 export interface KitchenQueueItem {
@@ -26,12 +32,12 @@ export class KitchenApi extends BaseApiService {
     return this.http.get<KitchenZone[]>(`${this.baseUrl}/kitchen/zones`);
   }
 
-  createZone(name: string): Observable<KitchenZone> {
-    return this.http.post<KitchenZone>(`${this.baseUrl}/kitchen/zones`, { name });
+  createZone(name: string, printingEnabled: boolean): Observable<KitchenZone> {
+    return this.http.post<KitchenZone>(`${this.baseUrl}/kitchen/zones`, { name, printingEnabled });
   }
 
-  updateZone(id: number, name: string): Observable<KitchenZone> {
-    return this.http.put<KitchenZone>(`${this.baseUrl}/kitchen/zones/${id}`, { name });
+  updateZone(id: number, name: string, printingEnabled: boolean): Observable<KitchenZone> {
+    return this.http.put<KitchenZone>(`${this.baseUrl}/kitchen/zones/${id}`, { name, printingEnabled });
   }
 
   deleteZone(id: number): Observable<void> {
@@ -52,5 +58,29 @@ export class KitchenApi extends BaseApiService {
 
   getProducts(): Observable<Product[]> {
     return this.http.get<Product[]>(`${this.baseUrl}/products`);
+  }
+
+  // Print Stations endpoints
+  getPrintStations(): Observable<PrintStation[]> {
+    return this.http.get<PrintStation[]>(`${this.baseUrl}/kitchen/print-stations`);
+  }
+
+  createPrintStation(name: string): Observable<PrintStation> {
+    return this.http.post<PrintStation>(`${this.baseUrl}/kitchen/print-stations`, { name });
+  }
+
+  deletePrintStation(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/kitchen/print-stations/${id}`);
+  }
+
+  // Manual Audit Logging endpoint
+  logAuditEvent(eventType: string, module: string, deviceId: string, payload: any, reason?: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/audit-events`, {
+      eventType,
+      module,
+      deviceId,
+      payload,
+      reason
+    });
   }
 }

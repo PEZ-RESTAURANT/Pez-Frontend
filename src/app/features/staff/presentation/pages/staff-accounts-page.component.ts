@@ -5,11 +5,12 @@ import { Router } from '@angular/router';
 import { StaffApi, UserResource } from '../../infrastructure/api/staff.api';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 @Component({
   selector: 'app-staff-accounts-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-6xl mx-auto space-y-6">
 
@@ -22,12 +23,23 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
           </p>
         </div>
 
-        <button 
-          (click)="openCreateModal()"
-          class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
-        >
-          + Nueva Cuenta
-        </button>
+        <div class="flex gap-2">
+          <button 
+            (click)="openInviteModal()"
+            class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            Invitar por Link
+          </button>
+          <button 
+            (click)="openCreateModal()"
+            class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+          >
+            + Nueva Cuenta
+          </button>
+        </div>
       </div>
 
       <!-- ================= LISTADO DE USUARIOS ================= -->
@@ -191,7 +203,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         <!-- SELECCIONAR ROL -->
         <div>
           <label class="block text-[10px] font-black uppercase text-gray-400 mb-1.5">Rol asignado</label>
-          <select 
+          <select appSelect
             [(ngModel)]="userForm.requestedRole"
             name="uRole"
             required
@@ -227,7 +239,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
           <button 
             type="button"
             (click)="closeModal()"
-            class="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-850 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer"
+            class="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-855 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer"
           >
             Cancelar
           </button>
@@ -240,6 +252,133 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         </div>
       </form>
     </app-modal-shell>
+
+    <!-- MODAL DE INVITACIÓN POR LINK -->
+    <app-modal-shell
+      [open]="isInviteModalOpen()"
+      title="Invitaciones por Link"
+      description="Genera enlaces únicos de invitación para que tus colaboradores registren sus propias cuentas."
+      [hasFooter]="false"
+      (close)="closeInviteModal()"
+    >
+      <div class="space-y-6 text-xs font-bold text-gray-700 dark:text-gray-300">
+        
+        <!-- FORMULARIO DE GENERACIÓN -->
+        <div class="bg-gray-50 dark:bg-gray-900 p-5 rounded-2xl border border-gray-150 dark:border-gray-800 space-y-4">
+          <div>
+            <label class="block text-[10px] font-black uppercase text-gray-400 mb-1.5">Correo Electrónico del Colaborador</label>
+            <input 
+              type="email"
+              [(ngModel)]="inviteForm.email"
+              placeholder="colaborador@correo.com"
+              class="w-full px-4 py-2.5 bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-[10px] font-black uppercase text-gray-400 mb-1.5">Rol del Colaborador</label>
+            <select appSelect
+              [(ngModel)]="inviteForm.requestedRole"
+              class="w-full px-4 py-2.5 bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="WAITER">WAITER (Mozo)</option>
+              <option value="CASHIER">CASHIER (Cajero)</option>
+              <option value="COOK">COOK (Cocinero)</option>
+            </select>
+          </div>
+          
+          <button 
+            (click)="generateInvite()"
+            class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider"
+          >
+            Generar Link de Invitación
+          </button>
+        </div>
+
+        <!-- LINK GENERADO -->
+        @if (generatedLink()) {
+          <div class="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-4 space-y-3 animate-in zoom-in-95 duration-350">
+            <div class="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">¡Link Generado Exitosamente!</div>
+            <div class="flex items-center gap-2">
+              <input 
+                type="text" 
+                readonly 
+                [value]="generatedLink()" 
+                class="w-full px-3 py-2 bg-gray-950 border border-gray-900 rounded-lg font-mono text-[11px] text-emerald-400 font-bold focus:outline-none shadow-inner"
+              />
+              <button 
+                (click)="copyLink()"
+                class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-lg cursor-pointer transition-colors uppercase tracking-wider"
+              >
+                Copiar
+              </button>
+            </div>
+            <div class="text-[9px] font-bold text-emerald-600 dark:text-emerald-500">Este enlace expira en 48 horas y solo puede usarse una vez.</div>
+          </div>
+        }
+
+        <!-- LISTADO DE INVITACIONES -->
+        <div class="space-y-3">
+          <h4 class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Historial de Invitaciones</h4>
+          
+          <div class="max-h-60 overflow-y-auto border border-gray-150 dark:border-gray-855 rounded-2xl overflow-hidden">
+            <table class="w-full text-left border-collapse text-xs font-bold text-gray-700 dark:text-gray-300">
+              <thead>
+                <tr class="bg-gray-50/50 dark:bg-gray-900/40 text-[9px] font-black uppercase text-gray-400 tracking-wider border-b border-gray-150 dark:border-gray-855">
+                  <th class="p-3">Código</th>
+                  <th class="p-3">Correo</th>
+                  <th class="p-3">Rol</th>
+                  <th class="p-3">Estado</th>
+                  <th class="p-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 dark:divide-gray-855">
+                @for (inv of invitations(); track inv.id) {
+                  <tr class="hover:bg-gray-50 dark:hover:bg-gray-850/30 transition-colors">
+                    <td class="p-3 font-mono text-gray-900 dark:text-white">{{ inv.code }}</td>
+                    <td class="p-3 text-gray-605 dark:text-gray-400 font-mono">{{ inv.email }}</td>
+                    <td class="p-3">
+                      <span [ngClass]="getRoleBadgeClasses(inv.requestedRole)" class="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border">
+                        {{ inv.requestedRole }}
+                      </span>
+                    </td>
+                    <td class="p-3">
+                      @if (inv.used) {
+                        <span class="text-gray-400 dark:text-gray-500 font-black uppercase text-[9px]">Utilizada</span>
+                      } @else if (inv.revoked) {
+                        <span class="text-rose-600 dark:text-rose-450 font-black uppercase text-[9px]">Revocada</span>
+                      } @else if (inv.expired) {
+                        <span class="text-amber-600 dark:text-amber-450 font-black uppercase text-[9px]">Expirada</span>
+                      } @else {
+                        <span class="text-emerald-600 dark:text-emerald-450 font-black uppercase text-[9px]">Activa</span>
+                      }
+                    </td>
+                    <td class="p-3 text-right">
+                      @if (!inv.used && !inv.revoked && !inv.expired) {
+                        <button 
+                          (click)="revokeInvite(inv.code)"
+                          class="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-[9px] font-black uppercase rounded-lg transition-colors cursor-pointer"
+                        >
+                          Revocar
+                        </button>
+                      } @else {
+                        <span class="text-gray-300 dark:text-gray-700">—</span>
+                      }
+                    </td>
+                  </tr>
+                }
+                @if (invitations().length === 0) {
+                  <tr>
+                    <td colspan="4" class="p-6 text-center text-gray-400 font-bold">No hay invitaciones generadas.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </app-modal-shell>
   `
 })
 export class StaffAccountsPageComponent implements OnInit {
@@ -250,6 +389,15 @@ export class StaffAccountsPageComponent implements OnInit {
   public users = signal<UserResource[]>([]);
   public isModalOpen = signal<boolean>(false);
   public editMode = signal<boolean>(false);
+
+  // Invite link flow states
+  public isInviteModalOpen = signal<boolean>(false);
+  public invitations = signal<any[]>([]);
+  public generatedLink = signal<string>('');
+  public inviteForm = {
+    requestedRole: 'WAITER' as 'CASHIER' | 'WAITER' | 'COOK',
+    email: ''
+  };
 
   public userForm = {
     id: 0,
@@ -303,6 +451,63 @@ export class StaffAccountsPageComponent implements OnInit {
 
   closeModal(): void {
     this.isModalOpen.set(false);
+  }
+
+  // Invite methods
+  openInviteModal(): void {
+    this.generatedLink.set('');
+    this.inviteForm.email = '';
+    this.isInviteModalOpen.set(true);
+    this.loadInvites();
+  }
+
+  closeInviteModal(): void {
+    this.isInviteModalOpen.set(false);
+  }
+
+  loadInvites(): void {
+    this.api.getStaffInvites().subscribe({
+      next: (data) => this.invitations.set(data),
+      error: () => this.notify.error('Error al cargar el historial de invitaciones.')
+    });
+  }
+
+  generateInvite(): void {
+    if (!this.inviteForm.email || !this.inviteForm.email.trim()) {
+      this.notify.error('Por favor, ingresa el correo electrónico del colaborador.');
+      return;
+    }
+    this.api.generateStaffInvite(this.inviteForm.requestedRole, this.inviteForm.email.trim()).subscribe({
+      next: (res) => {
+        const link = window.location.origin + '/join/' + res.code;
+        this.generatedLink.set(link);
+        this.notify.success('Código de invitación generado e invitación enviada por correo.');
+        this.loadInvites();
+      },
+      error: (err) => this.notify.error(err.error?.message || 'Error al generar la invitación.')
+    });
+  }
+
+  revokeInvite(code: string): void {
+    if (!confirm('¿Estás seguro de que deseas revocar esta invitación? El colaborador ya no podrá registrarse con este código.')) {
+      return;
+    }
+    this.api.revokeStaffInvite(code).subscribe({
+      next: () => {
+        this.notify.success('Invitación revocada.');
+        this.loadInvites();
+      },
+      error: (err) => this.notify.error(err.error?.message || 'Error al revocar la invitación.')
+    });
+  }
+
+  copyLink(): void {
+    if (!this.generatedLink()) return;
+    navigator.clipboard.writeText(this.generatedLink()).then(() => {
+      this.notify.success('¡Enlace copiado al portapapeles!');
+    }, () => {
+      this.notify.error('Error al copiar el enlace.');
+    });
   }
 
   saveUser(): void {

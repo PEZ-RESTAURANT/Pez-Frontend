@@ -72,6 +72,9 @@ export const PERMISSIONS = {
   RESERVATIONS: {
     VIEW: 'reservations.view',
     MANAGE: 'reservations.manage'
+  },
+  BILLING: {
+    VOID_SALE: 'billing.void_sale'
   }
 } as const;
 

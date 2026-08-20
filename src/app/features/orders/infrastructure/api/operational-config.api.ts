@@ -7,6 +7,8 @@ export interface OperationalConfig {
   cutoffMinute: number;
   unattendedThresholdMinutes: number;
   waitingDishesThresholdMinutes: number;
+  annulmentNotificationPref?: string;
+  dailySummaryTime?: string;
 }
 
 @Injectable({ providedIn: 'root' })

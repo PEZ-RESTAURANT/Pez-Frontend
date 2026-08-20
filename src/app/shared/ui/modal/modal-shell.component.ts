@@ -19,7 +19,8 @@ import { CommonModule } from '@angular/common';
         class="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-[100] p-4 sm:p-6 animate-in fade-in duration-200"
         role="dialog"
         aria-modal="true"
-        (click)="onBackdropClick($event)"
+        (mousedown)="onBackdropMousedown($event)"
+        (mouseup)="onBackdropMouseup($event)"
       >
         <div
           class="bg-white dark:bg-gray-900 text-foreground w-full rounded-xl border border-gray-200 dark:border-gray-800 shadow-2xl flex flex-col relative animate-in zoom-in-[0.98] duration-200 ease-out"
@@ -29,7 +30,8 @@ import { CommonModule } from '@angular/common';
           [class.max-h-[90vh]]="size === 'xl'"
           [class.h-full]="size === 'xl'"
           [class.overflow-hidden]="!allowBodyScroll"
-          (click)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (mouseup)="$event.stopPropagation()"
         >
           <!-- Botón de Cerrar -->
           <div class="relative shrink-0 z-[70] flex justify-end p-2 min-h-[2.5rem]">
@@ -46,10 +48,10 @@ import { CommonModule } from '@angular/common';
           </div>
 
           @if (title) {
-            <div class="flex flex-col space-y-1.5 px-6 pt-0 pb-4 border-b shrink-0 -mt-8 border-gray-200 dark:border-gray-800">
-              <h2 class="text-xl font-semibold leading-none tracking-tight pr-10">{{ title }}</h2>
+            <div class="flex flex-col space-y-1 px-6 pt-0 pb-4 border-b shrink-0 -mt-8 border-gray-200 dark:border-gray-800">
+              <h2 class="text-xl font-black text-gray-900 dark:text-white tracking-tight pr-10">{{ title }}</h2>
               @if (description) {
-                <p class="text-sm text-gray-500">{{ description }}</p>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 leading-snug">{{ description }}</p>
               }
             </div>
           }
@@ -83,10 +85,19 @@ export class ModalShellComponent {
 
   @Output() close = new EventEmitter<void>();
 
-  onBackdropClick(event: MouseEvent): void {
+  private isMousedownOnBackdrop = false;
+
+  onBackdropMousedown(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
+      this.isMousedownOnBackdrop = true;
+    }
+  }
+
+  onBackdropMouseup(event: MouseEvent): void {
+    if (this.isMousedownOnBackdrop && event.target === event.currentTarget) {
       this.close.emit();
     }
+    this.isMousedownOnBackdrop = false;
   }
 
   @HostListener('document:keydown.escape')

@@ -18,6 +18,7 @@ import { CatalogApi, Product } from '../../../catalog/infrastructure/api/catalog
 import { NotificationService } from '../../../../core/services/notification.service';
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 
 Chart.register(...registerables);
@@ -25,7 +26,7 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-analytics-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
 
@@ -58,7 +59,7 @@ Chart.register(...registerables);
           <!-- Preset selector -->
           <div class="flex flex-col">
             <span class="text-[9px] uppercase font-black tracking-wider text-gray-400 mb-1">Preset de Fecha</span>
-            <select 
+            <select appSelect
               [(ngModel)]="selectedPresetKey"
               (change)="onPresetChange()"
               class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg font-bold text-xs text-gray-900 dark:text-white focus:outline-none"
@@ -314,7 +315,7 @@ Chart.register(...registerables);
             </div>
 
             <!-- Product selector -->
-            <select 
+            <select appSelect
               [(ngModel)]="selectedProductId"
               (change)="onProductChange()"
               class="px-2.5 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg font-bold text-[10px] text-gray-900 dark:text-white focus:outline-none max-w-[200px]"

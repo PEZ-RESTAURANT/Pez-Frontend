@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -16,7 +16,7 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
   template: `
     <div class="space-y-6">
       <div class="text-center space-y-2">
-        <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white">Ingresar a PEZ</h2>
+        <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white">Ingresar a Al Toque</h2>
         <p class="text-sm text-gray-500">Inicia sesión con tu cuenta de empleado</p>
       </div>
 
@@ -61,9 +61,9 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
           type="submit"
           appButton
           userClass="w-full mt-2"
-          [disabled]="loading"
+          [disabled]="loading()"
         >
-          {{ loading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+          {{ loading() ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
         </button>
       </form>
     </div>
@@ -75,34 +75,34 @@ export class LoginPageComponent {
   private permission = inject(PermissionService);
   private router = inject(Router);
   private notifier = inject(NotificationService);
-
+ 
   email = '';
   password = '';
-  loading = false;
-
+  loading = signal<boolean>(false);
+ 
   onSubmit(event: Event): void {
     event.preventDefault();
     if (!this.email || !this.password) return;
-
-    this.loading = true;
+ 
+    this.loading.set(true);
     this.authApi.signIn(this.email, this.password).subscribe({
       next: (res) => {
         this.session.saveSession(res.token, res.user);
-
+ 
         this.permission.loadPermissions().subscribe({
           next: () => {
-            this.loading = false;
+            this.loading.set(false);
             this.notifier.success('¡Sesión iniciada con éxito!');
             this.router.navigate(['/app/dashboard']);
           },
           error: () => {
-            this.loading = false;
+            this.loading.set(false);
             this.notifier.error('No se pudieron cargar los permisos del usuario.');
           }
         });
       },
       error: (err) => {
-        this.loading = false;
+        this.loading.set(false);
         const msg = err.error?.message || 'Correo o contraseña incorrectos. Por favor, intente de nuevo.';
         this.notifier.error(msg);
       }

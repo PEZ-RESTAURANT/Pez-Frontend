@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BaseApiService } from '../../../../core/http/base-api.service';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface MovementsSummary {
   totalSales: number;
@@ -12,7 +13,7 @@ export interface CashMovement {
   id: number;
   type: 'INCOME' | 'EXPENSE';
   amount: number;
-  reason: 'SUPPLIER_PAYMENT' | 'CASH_WITHDRAWAL' | 'PETTY_CASH' | 'OTHER';
+  reason: 'SUPPLIER_PAYMENT' | 'CASH_WITHDRAWAL' | 'PETTY_CASH' | 'OTHER' | 'REVERSO_ANULACION_VENTA';
   note: string;
   createdAt: string;
 }
@@ -41,22 +42,33 @@ export interface SalePayment {
 }
 
 export interface SaleDetail {
-  productId: number;
+  productName: string;
   quantity: number;
   unitPrice: number;
+  totalPrice?: number;
+  note?: string;
 }
 
 export interface Sale {
   id: number;
   orderId: number;
   documentType: 'NOTE' | 'RECEIPT' | 'INVOICE' | 'BOLETA' | 'FACTURA_ELECTRONICA';
+  ticketNumber?: string;
   customerDocumentNumber?: string;
   customerName?: string;
+  total?: number;
   totalAmount: number;
-  status: 'PENDING' | 'PAID' | 'CANCELLED';
+  status: 'PENDING' | 'ISSUED_UNPAID' | 'PAID' | 'VOIDED' | 'CANCELLED';
   payments: SalePayment[];
   details: SaleDetail[];
   createdAt: string;
+  cashierName?: string;
+  waiterName?: string;
+  orderCreatedAt?: string;
+  orderDeliveredAt?: string;
+  voidedReason?: string;
+  voidedBy?: string;
+  voidedAt?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -96,7 +108,34 @@ export class CashRegisterApi extends BaseApiService {
   }
 
   getSales(): Observable<Sale[]> {
-    return this.http.get<Sale[]>(`${this.baseUrl}/sales`);
+    return this.http.get<Sale[]>(`${this.baseUrl}/sales`).pipe(
+      map(sales => sales.map(s => ({
+        ...s,
+        totalAmount: s.totalAmount ?? s.total ?? 0
+      })))
+    );
+  }
+
+  getSalesWithDates(from: string, to: string): Observable<Sale[]> {
+    return this.http.get<Sale[]>(`${this.baseUrl}/sales`, {
+      params: { from, to }
+    }).pipe(
+      map(sales => sales.map(s => ({
+        ...s,
+        totalAmount: s.totalAmount ?? s.total ?? 0
+      })))
+    );
+  }
+
+  voidSale(saleId: number, voidedReason: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/sales/${saleId}/void`, { voidedReason });
+  }
+
+  getCashRegisters(startDate?: string, endDate?: string): Observable<CashRegister[]> {
+    const params: any = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    return this.http.get<CashRegister[]>(`${this.baseUrl}/cash-registers`, { params });
   }
 
   registerPayments(saleId: number, payments: SalePayment[]): Observable<void> {
@@ -106,7 +145,12 @@ export class CashRegisterApi extends BaseApiService {
   findSaleByRuc(ruc: string): Observable<Sale[]> {
     return this.http.get<Sale[]>(`${this.baseUrl}/sales`, {
       params: { customerDocumentNumber: ruc }
-    });
+    }).pipe(
+      map(sales => sales.map(s => ({
+        ...s,
+        totalAmount: s.totalAmount ?? s.total ?? 0
+      })))
+    );
   }
 
   getActivePaymentMethods(): Observable<PaymentMethodConfig[]> {

@@ -8,11 +8,12 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 @Component({
   selector: 'app-reservations-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
 
@@ -230,7 +231,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         <!-- Optional Table Assignation -->
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Mesa Asignada (Opcional)</label>
-          <select 
+          <select appSelect
             [(ngModel)]="form.tableId"
             name="resTable"
             class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white focus:outline-none"

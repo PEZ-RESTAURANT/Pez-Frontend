@@ -12,11 +12,12 @@ import { ReservationsApi, Reservation } from '../../infrastructure/api/reservati
 import { OperationalConfigApi, OperationalConfig } from '../../infrastructure/api/operational-config.api';
 import { Order, ACTIVE_ORDER_STATUSES } from '../../domain/models/orders.model';
 import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 @Component({
   selector: 'app-orders-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
       
@@ -341,7 +342,7 @@ import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billi
       <div class="space-y-4 text-sm text-foreground">
         <div>
           <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mesa Ancla (Principal)</label>
-          <select 
+          <select appSelect
             [(ngModel)]="selectedAnchorId"
             (change)="onAnchorChange()"
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -402,7 +403,7 @@ import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billi
       <div class="space-y-4 text-sm text-foreground">
         <div>
           <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mesa de Origen (Con pedido activo)</label>
-          <select 
+          <select appSelect
             [(ngModel)]="selectedTransferFrom"
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
@@ -415,7 +416,7 @@ import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billi
 
         <div>
           <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">Mesa de Destino (Debe estar libre)</label>
-          <select 
+          <select appSelect
             [(ngModel)]="selectedTransferTo"
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >

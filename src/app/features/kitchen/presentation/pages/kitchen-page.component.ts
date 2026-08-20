@@ -53,84 +53,84 @@ import { Subscription, interval } from 'rxjs';
       <!-- BOARD DE PREPARACIONES (KDS GRID) -->
       @if (selectedZoneId()) {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          @for (item of queue(); track item.id) {
+          @for (group of groupedQueue(); track group.orderId) {
             <div 
-              [ngClass]="getCardClasses(item)"
-              class="rounded-2xl border-2 p-5 flex flex-col justify-between min-h-[220px] shadow-sm transition-all duration-300 relative"
+              class="rounded-2xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 flex flex-col justify-between min-h-[220px] shadow-sm transition-all duration-300 relative"
             >
               
               <!-- CARD HEADER -->
-              <div class="space-y-1">
-                <div class="flex justify-between items-start">
+              <div class="space-y-4">
+                <div class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-700/60">
                   <!-- MESA / PEDIDO ORIGEN -->
-                  <span class="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-700 dark:text-gray-300">
-                    {{ item.tableNumber ? 'Mesa M' + item.tableNumber : 'Para Llevar' }}
+                  <span class="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-black/5 dark:bg-white/10 text-gray-750 dark:text-gray-300">
+                    {{ group.tableNumber ? 'Mesa M' + group.tableNumber : 'Para Llevar' }}
                   </span>
                   
                   <!-- ID DE COMANDA -->
                   <span class="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
-                    Pedido #{{ item.orderId }}
+                    Pedido #{{ group.orderId }}
                   </span>
                 </div>
 
-                <!-- DISH NAME & QUANTITY -->
-                <div class="flex items-baseline justify-between pt-2">
-                  <h3 class="text-lg font-black text-gray-900 dark:text-white leading-tight">
-                    {{ getProductName(item.productId) }}
-                  </h3>
-                  <span class="text-lg font-black text-blue-600 dark:text-blue-400 ml-2 shrink-0">
-                    x{{ item.quantity }}
-                  </span>
+                <!-- ITEMS LIST -->
+                <div class="divide-y divide-gray-100 dark:divide-gray-700/60 space-y-3">
+                  @for (item of group.items; track item.id) {
+                    <div class="pt-2 flex flex-col gap-1.5 transition-all" [class.opacity-40]="item.status === 'READY'" [class.line-through]="item.status === 'READY'">
+                      <div class="flex items-baseline justify-between">
+                        <span class="text-sm font-bold text-gray-800 dark:text-gray-200">
+                          {{ getProductName(item.productId) }}
+                        </span>
+                        <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400 shrink-0 ml-2">
+                          x{{ item.quantity }}
+                        </span>
+                      </div>
+                      
+                      @if (item.note) {
+                        <div class="text-[10px] text-purple-705 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/20 px-2 py-1 rounded">
+                          OBS: {{ item.note }}
+                        </div>
+                      }
+
+                      <!-- Item status/actions -->
+                      <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+                        <span class="font-semibold">{{ getElapsedTimeText(item.id, item.createdAt) }}</span>
+                        
+                        <!-- Status Badge or Action Button -->
+                        <div>
+                          @if (item.status === 'PENDING') {
+                            <button 
+                              (click)="startPrep(item.id)"
+                              class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
+                            >
+                              Empezar
+                            </button>
+                          } @else if (item.status === 'IN_PREPARATION') {
+                            <button 
+                              (click)="markReady(item.id)"
+                              class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg cursor-pointer uppercase text-[9px] border-none"
+                            >
+                              Listo
+                            </button>
+                          } @else {
+                            <span class="text-emerald-500 font-extrabold">✓ LISTO</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
                 </div>
 
-                <!-- OBSERVACIÓN DESTACADA -->
-                @if (item.note) {
-                  <div class="bg-purple-50 dark:bg-purple-950/30 border border-purple-200/50 dark:border-purple-900/50 text-purple-800 dark:text-purple-300 p-2.5 rounded-lg text-xs font-extrabold flex items-start gap-1.5 mt-2">
-                    <svg class="h-4 w-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <span>OBS: {{ item.note }}</span>
-                  </div>
-                }
-              </div>
-
-              <!-- CARD FOOTER & ACTIONS -->
-              <div class="mt-4 pt-3 border-t border-gray-150 dark:border-gray-700/60 flex items-center justify-between">
-                <!-- TIMER TRANSCURRIDO IN VIVO -->
-                <div class="flex flex-col text-left">
-                  <span class="text-[9px] uppercase font-bold text-gray-400">Transcurrido</span>
-                  <span class="text-xs font-black text-gray-700 dark:text-gray-300">
-                    {{ getElapsedTimeText(item.id, item.createdAt) }}
-                  </span>
-                </div>
-
-                <!-- ACCIÓN DIRECTA SIN MODAL -->
-                @if (item.status === 'PENDING') {
-                  <button 
-                    (click)="startPrep(item.id)"
-                    class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider flex items-center justify-center min-h-[44px]"
-                  >
-                    Empezar
-                  </button>
-                } @else if (item.status === 'IN_PREPARATION') {
-                  <button 
-                    (click)="markReady(item.id)"
-                    class="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl cursor-pointer shadow-xs transition-colors uppercase tracking-wider flex items-center justify-center min-h-[44px]"
-                  >
-                    Listo
-                  </button>
-                }
               </div>
 
             </div>
           }
-          @if (queue().length === 0) {
+          @if (groupedQueue().length === 0) {
             <div class="col-span-full py-20 text-center text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
               <svg class="h-16 w-16 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               <h3 class="font-extrabold text-lg">Cola Vacía</h3>
-              <p class="text-xs text-gray-500 mt-1">No hay pedidos pendientes de preparación en la zona de {{ getActiveZoneName() }}.</p>
+              <p class="text-xs text-gray-500 mt-1">No hay comandas activas pendientes de preparación en la zona de {{ getActiveZoneName() }}.</p>
             </div>
           }
         </div>
@@ -160,8 +160,93 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   private timerSubscription?: Subscription;
   private wsSubscription?: Subscription;
 
+  // Local state to track items completed in this KDS screen session to strike them out
+  private sessionItemsMap = new Map<number, KitchenQueueItem>();
+  public localReadyItemIds = signal<Set<number>>(new Set<number>());
+
+  // Computed signal to group KDS items by comanda (orderId)
+  public groupedQueue = computed(() => {
+    const activeItems = this.queue();
+    const readyIds = this.localReadyItemIds();
+
+    // 1. Gather active orders
+    const activeOrderIds = new Set<number>();
+    activeItems.forEach(item => {
+      activeOrderIds.add(item.orderId);
+      this.sessionItemsMap.set(item.id, item);
+    });
+
+    // Combine active items with cached ones that were marked ready
+    const combined: KitchenQueueItem[] = [];
+    const includedIds = new Set<number>();
+
+    activeItems.forEach(item => {
+      if (readyIds.has(item.id)) {
+        combined.push({ ...item, status: 'READY' });
+      } else {
+        combined.push(item);
+      }
+      includedIds.add(item.id);
+    });
+
+    this.sessionItemsMap.forEach(item => {
+      if (activeOrderIds.has(item.orderId) && !includedIds.has(item.id)) {
+        if (readyIds.has(item.id) || item.status === 'READY') {
+          combined.push({ ...item, status: 'READY' });
+          includedIds.add(item.id);
+        }
+      }
+    });
+
+    // 2. Group by orderId
+    const groupsMap = new Map<number, KitchenQueueItem[]>();
+    combined.forEach(item => {
+      if (!groupsMap.has(item.orderId)) {
+        groupsMap.set(item.orderId, []);
+      }
+      groupsMap.get(item.orderId)!.push(item);
+    });
+
+    // 3. Filter completed groups and format resource DTOs
+    const finalGroups: { orderId: number; tableNumber?: number; createdAt: string; items: KitchenQueueItem[] }[] = [];
+    
+    groupsMap.forEach((items, orderId) => {
+      const allReady = items.every(item => item.status === 'READY' || readyIds.has(item.id));
+      if (!allReady) {
+        // Sort items: PENDING first, IN_PREPARATION second, READY last
+        const sortedItems = [...items].sort((a, b) => {
+          const statusOrder = { 'PENDING': 0, 'IN_PREPARATION': 1, 'READY': 2 };
+          return statusOrder[a.status] - statusOrder[b.status];
+        });
+
+        const first = items[0];
+        const minCreatedAt = items.reduce((min, it) => 
+          new Date(it.createdAt).getTime() < new Date(min).getTime() ? it.createdAt : min, 
+          first.createdAt
+        );
+
+        finalGroups.push({
+          orderId,
+          tableNumber: first.tableNumber,
+          createdAt: minCreatedAt,
+          items: sortedItems
+        });
+      } else {
+        // Clear finished comanda items from local caches
+        items.forEach(item => {
+          this.sessionItemsMap.delete(item.id);
+          if (readyIds.has(item.id)) {
+            readyIds.delete(item.id);
+          }
+        });
+      }
+    });
+
+    // Sort by comanda timestamp oldest first (FIFO)
+    return finalGroups.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  });
+
   constructor() {
-    // Escucha cambios en el restaurantId de la sesión para subscribirse a los eventos del WebSocket de Cocina
     effect(() => {
       const restaurantId = this.session.getRestaurantId();
       if (restaurantId) {
@@ -173,12 +258,10 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // 1. Cargar las zonas disponibles
     this.api.getZones().subscribe({
       next: (zs) => {
         this.zones.set(zs);
 
-        // Restaurar zona seleccionada de localStorage
         const stored = localStorage.getItem('pez-kds-zone-id');
         if (stored) {
           const id = parseInt(stored, 10);
@@ -186,20 +269,17 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
             this.selectZone(id);
           }
         } else if (zs.length > 0) {
-          // Default a la primera zona
           this.selectZone(zs[0].id);
         }
       },
       error: () => this.notify.error('No se pudieron obtener las zonas de cocina del local.')
     });
 
-    // 2. Cargar catálogo de productos
     this.api.getProducts().subscribe({
       next: (prods) => this.products.set(prods),
       error: () => this.notify.error('No se pudo cargar el catálogo de platos.')
     });
 
-    // 3. Temporizador en vivo que incrementa el contador de segundos transcurridos cada 1s
     this.timerSubscription = interval(1000).subscribe(() => {
       this.updateTimers();
     });
@@ -222,7 +302,6 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
 
     this.api.getQueueByZone(zoneId).subscribe({
       next: (q) => {
-        // Ordenar en cola FIFO (primero en entrar, primero en salir) por fecha de creación
         const sorted = [...q].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         this.queue.set(sorted);
         this.updateTimers();
@@ -231,7 +310,6 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  // --- WEBSOCKET SYNC ---
   private subscribeToKitchenWebSocket(restaurantId: number): void {
     this.unsubscribeWS();
     this.wsSubscription = this.realtime.subscribeToKitchen(restaurantId).subscribe({
@@ -241,17 +319,25 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
         if (!type || !payload) return;
 
         if (type === 'ItemOrdered') {
-          // Si es un plato nuevo, recargamos la cola en segundo plano (DOM reconcile track by item.id evitará parpadeos)
           this.loadQueueSilently();
         } else if (type === 'ItemStatusChanged') {
           const itemId = payload.itemId;
           const newStatus = payload.newStatus;
           
           if (newStatus === 'READY' || newStatus === 'DELIVERED' || newStatus === 'CANCELLED') {
-            // Remover quirúrgicamente del estado local
+            if (newStatus === 'READY') {
+              this.localReadyItemIds.update(set => {
+                const newSet = new Set(set);
+                newSet.add(itemId);
+                return newSet;
+              });
+              const cached = this.sessionItemsMap.get(itemId);
+              if (cached) {
+                this.sessionItemsMap.set(itemId, { ...cached, status: 'READY' });
+              }
+            }
             this.queue.update(q => q.filter(item => item.id !== itemId));
           } else {
-            // Actualizar estado de preparación quirúrgicamente en el estado local
             this.queue.update(q => q.map(item => item.id === itemId ? { ...item, status: newStatus } : item));
           }
         } else if (type === 'ItemCancelled') {
@@ -283,11 +369,10 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- TIMER UTILITIES ---
   private updateTimers(): void {
     const newTimes: Record<number, number> = {};
     const now = Date.now();
-    this.queue().forEach(item => {
+    this.sessionItemsMap.forEach(item => {
       const elapsed = Math.floor((now - new Date(item.createdAt).getTime()) / 1000);
       newTimes[item.id] = Math.max(0, elapsed);
     });
@@ -303,19 +388,16 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
     return `${mins}m ${secs}s`;
   }
 
-  // --- PRODUCT INFO LOOKUP ---
   getProductName(productId: number): string {
     const prod = this.products().find(p => p.id === productId);
     return prod ? prod.name : `Plato #${productId}`;
   }
 
-  // --- URGENCIA CROMÁTICA ---
   public getUrgencyLevel(item: KitchenQueueItem): 'NORMAL' | 'AMBER' | 'RED' {
     const totalSeconds = this.elapsedSeconds()[item.id] || 0;
     const elapsedMinutes = totalSeconds / 60;
 
     const prod = this.products().find(p => p.id === item.productId);
-    // Umbral de tiempo estimado
     const prepLimit = prod && prod.estimatedPrepTimeMinutes ? prod.estimatedPrepTimeMinutes : 10;
 
     if (elapsedMinutes >= prepLimit * 1.5) {
@@ -326,22 +408,6 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
     return 'NORMAL';
   }
 
-  getCardClasses(item: KitchenQueueItem): Record<string, boolean> {
-    const urgency = this.getUrgencyLevel(item);
-    const inPrep = item.status === 'IN_PREPARATION';
-
-    return {
-      // Normal / Neutro
-      'bg-white border-gray-250 dark:bg-gray-800 dark:border-gray-700': urgency === 'NORMAL' && !inPrep,
-      'bg-blue-50/20 border-blue-400 dark:bg-blue-950/15 dark:border-blue-900': urgency === 'NORMAL' && inPrep,
-      // Ámbar (Alerta inicial de demora)
-      'bg-amber-50/40 border-amber-400 text-amber-900 dark:bg-amber-950/15 dark:border-amber-900/60 dark:text-amber-300': urgency === 'AMBER',
-      // Rojo (Demora crítica, parpadeo sutil)
-      'bg-red-50/50 border-red-500 text-red-950 dark:bg-red-950/25 dark:border-red-900 dark:text-red-200 shadow-lg ring-1 ring-red-400/50': urgency === 'RED'
-    };
-  }
-
-  // --- ACTIONS (KITCHEN TRANSITIONS) ---
   startPrep(itemId: number): void {
     this.api.startPreparation(itemId).subscribe({
       next: () => {
@@ -353,12 +419,32 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
   }
 
   markReady(itemId: number): void {
+    this.localReadyItemIds.update(set => {
+      const newSet = new Set(set);
+      newSet.add(itemId);
+      return newSet;
+    });
+    const cached = this.sessionItemsMap.get(itemId);
+    if (cached) {
+      this.sessionItemsMap.set(itemId, { ...cached, status: 'READY' });
+    }
+
     this.api.markReady(itemId).subscribe({
       next: () => {
         this.notify.success('Plato marcado como listo.');
         this.loadQueue();
       },
-      error: () => this.notify.error('No se pudo marcar el plato como listo.')
+      error: () => {
+        this.localReadyItemIds.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(itemId);
+          return newSet;
+        });
+        if (cached) {
+          this.sessionItemsMap.set(itemId, cached);
+        }
+        this.notify.error('No se pudo marcar el plato como listo.');
+      }
     });
   }
 

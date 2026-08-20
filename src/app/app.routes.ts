@@ -7,8 +7,16 @@ import { PERMISSIONS } from './core/config/permissions';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'app',
-    pathMatch: 'full'
+    pathMatch: 'full',
+    loadComponent: () => import('./features/auth/presentation/pages/landing-page.component').then(m => m.LandingPageComponent)
+  },
+  {
+    path: 'registro',
+    loadComponent: () => import('./features/auth/presentation/pages/register-restaurant-page.component').then(m => m.RegisterRestaurantPageComponent)
+  },
+  {
+    path: 'join/:code',
+    loadComponent: () => import('./features/auth/presentation/pages/join-page.component').then(m => m.JoinPageComponent)
   },
   {
     path: 'auth',
@@ -59,6 +67,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/orders/presentation/pages/order-detail-page.component').then(m => m.OrderDetailPageComponent),
         canActivate: [permissionGuard],
         data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
+      },
+      {
+        path: 'orders/history',
+        loadComponent: () => import('./features/orders/presentation/pages/sales-history-page.component').then(m => m.SalesHistoryPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.CASHREGISTER.VIEW }
       },
       {
         path: 'kitchen',

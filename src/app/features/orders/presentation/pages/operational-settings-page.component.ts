@@ -4,10 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { OperationalConfigApi, OperationalConfig } from '../../infrastructure/api/operational-config.api';
 import { NotificationService } from '../../../../core/services/notification.service';
 
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+
 @Component({
   selector: 'app-operational-settings-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SelectDirective],
   template: `
     <div class="p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
       
@@ -93,6 +95,49 @@ import { NotificationService } from '../../../../core/services/notification.serv
           </div>
         </div>
 
+        <!-- SECCIÓN: NOTIFICACIONES Y RESUMEN DIARIO -->
+        <div class="space-y-4 pt-4">
+          <div class="border-b border-gray-100 dark:border-gray-700/60 pb-2">
+            <h3 class="text-sm font-black uppercase text-gray-900 dark:text-white tracking-wider flex items-center gap-2">
+              <svg class="h-4.5 w-4.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              Notificaciones y Reportes por Correo
+            </h3>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Notificación de Anulaciones *</label>
+              <select appSelect
+                required
+                [(ngModel)]="config.annulmentNotificationPref"
+                class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="INSTANT">Instantánea (Correo en el momento)</option>
+                <option value="SUMMARY">Resumen Diario (Consolidado al cierre)</option>
+                <option value="NONE">Ninguna</option>
+              </select>
+              <p class="text-[10px] text-gray-400 mt-1.5 font-medium">
+                Indica cuándo y cómo deben notificarse las cancelaciones de platos/ítems por parte del personal de caja o salón.
+              </p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Hora del Reporte Diario Consolidado *</label>
+              <input 
+                type="time" 
+                required
+                [(ngModel)]="config.dailySummaryTime"
+                class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p class="text-[10px] text-gray-400 mt-1.5 font-medium">
+                Hora a la que se compilará y enviará el correo consolidado con el stock bajo, asistencias, anulaciones y estado de cajas.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- ACCIONES -->
         <div class="flex justify-end pt-4 border-t border-gray-100 dark:border-gray-700/60">
           <button 
@@ -118,7 +163,9 @@ export class OperationalSettingsPageComponent implements OnInit {
     cutoffHour: 3,
     cutoffMinute: 0,
     unattendedThresholdMinutes: 15,
-    waitingDishesThresholdMinutes: 30
+    waitingDishesThresholdMinutes: 30,
+    annulmentNotificationPref: 'INSTANT',
+    dailySummaryTime: '22:00'
   };
 
   public cutoffTimeInput = '03:00';
@@ -135,6 +182,12 @@ export class OperationalSettingsPageComponent implements OnInit {
         const hStr = String(cfg.cutoffHour).padStart(2, '0');
         const mStr = String(cfg.cutoffMinute).padStart(2, '0');
         this.cutoffTimeInput = `${hStr}:${mStr}`;
+        if (!cfg.dailySummaryTime) {
+          this.config.dailySummaryTime = '22:00';
+        }
+        if (!cfg.annulmentNotificationPref) {
+          this.config.annulmentNotificationPref = 'INSTANT';
+        }
         this.loading.set(false);
       },
       error: () => {

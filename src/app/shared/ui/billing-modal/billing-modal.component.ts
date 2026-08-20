@@ -10,11 +10,12 @@ import { OrdersService } from '../../../features/orders/infrastructure/services/
 import { PrintPreviewComponent } from '../../../features/orders/presentation/components/print-preview.component';
 import { LookupApi } from '../../../features/billing/infrastructure/api/lookup.api';
 import { SelectOnFocusDirective } from '../../../shared/utils/select-on-focus.directive';
+import { SelectDirective } from '../select/select.directive';
 
 @Component({
   selector: 'app-billing-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent, SelectOnFocusDirective],
+  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent, SelectOnFocusDirective, SelectDirective],
   template: `
     <app-modal-shell
       [open]="open"
@@ -160,7 +161,7 @@ import { SelectOnFocusDirective } from '../../../shared/utils/select-on-focus.di
             <!-- PAYMENT LINES -->
             @for (line of paymentLines; track $index) {
               <div class="flex gap-2 items-center">
-                <select 
+                <select appSelect
                   [(ngModel)]="line.method"
                   class="flex-1 px-3 py-3.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white min-h-[46px]"
                 >

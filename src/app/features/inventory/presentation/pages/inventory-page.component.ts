@@ -122,21 +122,30 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
                       {{ sup.name }}
                     </td>
                     <td class="py-3.5 px-4 text-gray-500">{{ sup.unit || '-' }}</td>
-                    <td class="py-3.5 px-4">{{ sup.minThreshold | number:'1.2-2' }}</td>
+                    <td class="py-3.5 px-4">
+                      <span>Mín: {{ sup.minThreshold | number:'1.2-2' }}</span>
+                      @if (sup.criticalThreshold) {
+                        <div class="text-[10px] text-red-500 font-semibold mt-0.5">Crít: {{ sup.criticalThreshold | number:'1.2-2' }}</div>
+                      }
+                    </td>
                     <td class="py-3.5 px-4">
                       <span 
-                        [class.text-amber-500]="sup.currentStock >= 0 && sup.currentStock < sup.minThreshold"
-                        [class.text-red-500]="sup.currentStock < 0"
+                        [class.text-amber-500]="sup.stockLevel === 'BAJO'"
+                        [class.text-amber-600]="sup.stockLevel === 'CRITICO'"
+                        [class.text-red-500]="sup.stockLevel === 'AGOTADO' || sup.currentStock < 0"
+                        [class.text-emerald-600]="sup.stockLevel === 'ESTABLE' && sup.currentStock >= 0"
                         class="font-black text-sm"
                       >
                         {{ sup.currentStock | number:'1.2-2' }}
                       </span>
                       @if (sup.currentStock < 0) {
                         <span class="ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">Desalineado</span>
-                      } @else if (sup.currentStock === 0) {
+                      } @else if (sup.stockLevel === 'AGOTADO') {
                         <span class="ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">Agotado</span>
-                      } @else if (sup.currentStock < sup.minThreshold) {
-                        <span class="ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500">Bajo Stock</span>
+                      } @else if (sup.stockLevel === 'CRITICO') {
+                        <span class="ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Crítico</span>
+                      } @else if (sup.stockLevel === 'BAJO') {
+                        <span class="ml-2 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-yellow-500/10 text-amber-500">Bajo Stock</span>
                       }
                     </td>
                     <td class="py-3.5 px-4 text-right" (click)="$event.stopPropagation()">
@@ -238,7 +247,13 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
                         [class.text-blue-500]="m.type === 'MANUAL_ADJUSTMENT'"
                         class="font-black text-sm"
                       >
-                        {{ m.type === 'RESTOCK' ? '+' : '-' }}{{ m.quantity | number:'1.2-2' }}
+                        @if (m.type === 'RESTOCK') {
+                          +{{ m.quantity | number:'1.2-2' }}
+                        } @else if (m.type === 'SALE_DEDUCTION') {
+                          -{{ m.quantity | number:'1.2-2' }}
+                        } @else {
+                          {{ m.quantity >= 0 ? '+' : '' }}{{ m.quantity | number:'1.2-2' }}
+                        }
                       </span>
                     </div>
                   </div>
@@ -304,6 +319,19 @@ import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus
             [(ngModel)]="supplyForm.minThreshold"
             name="sThreshold"
             placeholder="0"
+            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">Umbral de Alerta Crítico (Envío Instantáneo)</label>
+          <input 
+            type="number" 
+            step="0.0001" 
+            min="0"
+            [(ngModel)]="supplyForm.criticalThreshold"
+            name="sCriticalThreshold"
+            placeholder="Ej. Mitad del umbral mínimo"
             class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -489,7 +517,7 @@ export class InventoryPageComponent implements OnInit {
   public isDeleteConfirmModalOpen = signal<boolean>(false);
 
   // Forms Inputs
-  public supplyForm = { id: 0, name: '', unit: '', minThreshold: 0 };
+  public supplyForm = { id: 0, name: '', unit: '', minThreshold: 0, criticalThreshold: undefined as number | undefined };
   public inventoryQtyInput: number = 0;
   public inventoryReasonInput: string = '';
 
@@ -552,13 +580,13 @@ export class InventoryPageComponent implements OnInit {
   // --- SUPPLY CRUD ---
   openSupplyCreateModal(): void {
     this.supplyModalEditMode.set(false);
-    this.supplyForm = { id: 0, name: '', unit: '', minThreshold: 0 };
+    this.supplyForm = { id: 0, name: '', unit: '', minThreshold: 0, criticalThreshold: undefined };
     this.isSupplyModalOpen.set(true);
   }
 
   openSupplyEditModal(sup: Supply): void {
     this.supplyModalEditMode.set(true);
-    this.supplyForm = { id: sup.id, name: sup.name, unit: sup.unit || '', minThreshold: sup.minThreshold };
+    this.supplyForm = { id: sup.id, name: sup.name, unit: sup.unit || '', minThreshold: sup.minThreshold, criticalThreshold: sup.criticalThreshold };
     this.isSupplyModalOpen.set(true);
   }
 
@@ -567,14 +595,16 @@ export class InventoryPageComponent implements OnInit {
   }
 
   saveSupply(): void {
-    const { id, name, unit, minThreshold } = this.supplyForm;
+    const { id, name, unit, minThreshold, criticalThreshold } = this.supplyForm;
     if (!name.trim() || minThreshold < 0) {
       this.notify.error('Completa el nombre y un umbral mínimo válido.');
       return;
     }
 
+    const parsedCritical = (criticalThreshold !== undefined && criticalThreshold !== null) ? Number(criticalThreshold) : undefined;
+
     if (this.supplyModalEditMode()) {
-      this.api.updateSupply(id, name.trim(), unit.trim(), minThreshold).subscribe({
+      this.api.updateSupply(id, name.trim(), unit.trim(), minThreshold, parsedCritical).subscribe({
         next: () => {
           this.notify.success('Insumo actualizado con éxito.');
           this.closeSupplyModal();
@@ -583,7 +613,7 @@ export class InventoryPageComponent implements OnInit {
         error: () => this.notify.error('No se pudo actualizar el insumo.')
       });
     } else {
-      this.api.createSupply(name.trim(), unit.trim(), minThreshold).subscribe({
+      this.api.createSupply(name.trim(), unit.trim(), minThreshold, parsedCritical).subscribe({
         next: () => {
           this.notify.success('Nuevo insumo registrado.');
           this.closeSupplyModal();

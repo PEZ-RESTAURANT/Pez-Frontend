@@ -21,7 +21,12 @@ import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
           </svg>
         </button>
 
-        <h1 class="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Panel de Control</h1>
+        <div class="flex items-center gap-1.5">
+          <h1 class="text-base sm:text-lg font-black text-gray-900 dark:text-white">Al Toque</h1>
+          @if (sessionService.restaurantName$(); as name) {
+            <span class="text-xs font-semibold text-gray-400 dark:text-gray-500">· {{ name }}</span>
+          }
+        </div>
       </div>
 
       <div class="flex items-center gap-4">

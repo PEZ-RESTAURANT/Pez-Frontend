@@ -10,7 +10,7 @@ import { SessionService } from '../../../../core/auth/services/session.service';
     <div class="p-6 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-md">
       @if (sessionService.currentUser$(); as user) {
         <h2 class="text-2xl font-bold mb-2">¡Bienvenido, {{ user.firstName }}!</h2>
-        <p class="text-gray-500">Has ingresado exitosamente al sistema de gestión de PEZ.</p>
+        <p class="text-gray-500">Has ingresado exitosamente al sistema de gestión de Al Toque.</p>
         
         <div class="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 rounded-lg text-sm">
           <strong>Tus roles asignados:</strong> <span class="capitalize">{{ user.roles.join(', ') }}</span>

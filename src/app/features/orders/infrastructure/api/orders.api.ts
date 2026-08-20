@@ -63,6 +63,10 @@ export class OrdersApi extends BaseApiService {
     });
   }
 
+  addItemsBatch(orderId: number, items: { productId: number, quantity: number, note: string, waiterId: number }[]): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/orders/${orderId}/items/batch`, { items });
+  }
+
   changeItemStatus(orderId: number, itemId: number, status: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/orders/${orderId}/items/${itemId}/status`, null, {
       params: { status }

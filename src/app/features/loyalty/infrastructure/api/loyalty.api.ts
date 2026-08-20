@@ -6,6 +6,7 @@ export interface CustomerResource {
   id: number;
   phone: string;
   fullName: string;
+  email?: string;
   birthday?: string;
   address?: string;
   dataConsentAccepted: boolean;
@@ -16,6 +17,7 @@ export interface CustomerResource {
 export interface CreateCustomerPayload {
   phone: string;
   fullName: string;
+  email?: string;
   birthday?: string;
   address?: string;
   dataConsentAccepted: boolean;
@@ -88,5 +90,9 @@ export class LoyaltyApi extends BaseApiService {
 
   updateConfig(payload: LoyaltyConfigResource): Observable<LoyaltyConfigResource> {
     return this.http.put<LoyaltyConfigResource>(`${this.baseUrl}/loyalty/config`, payload);
+  }
+
+  sendPromotion(customerId: number, subject: string, message: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/customers/${customerId}/send-promotion`, { subject, message });
   }
 }

@@ -14,10 +14,12 @@ import { environment } from '../../../../../environments/environment';
 import { LoyaltyApi } from '../../../loyalty/infrastructure/api/loyalty.api';
 import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
 import { CashRegisterApi, Sale } from '../../../cashregister/infrastructure/api/cashregister.api';
+import { KitchenApi, KitchenZone } from '../../../kitchen/infrastructure/api/kitchen.api';
 import { ACTIVE_ORDER_STATUSES } from '../../domain/models/orders.model';
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
 import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 export interface CartLine {
   product: Product;
@@ -28,8 +30,37 @@ export interface CartLine {
 @Component({
   selector: 'app-order-detail-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent, BillingModalComponent, SelectOnFocusDirective],
+  imports: [CommonModule, FormsModule, ModalShellComponent, PrintPreviewComponent, BillingModalComponent, SelectOnFocusDirective, SelectDirective],
   template: `
+    <!-- ESTILOS DE IMPRESIÓN EXCLUSIVOS PARA COMANDAS DE COCINA -->
+    <style>
+      @media print {
+        body * {
+          visibility: hidden !important;
+        }
+        .kitchen-ticket-print-container, .kitchen-ticket-print-container * {
+          visibility: visible !important;
+        }
+        .kitchen-ticket-print-container {
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 80mm !important;
+          margin: 0 !important;
+          padding: 10px !important;
+          background: white !important;
+          color: black !important;
+          font-family: monospace !important;
+          font-size: 12px !important;
+          line-height: 1.25 !important;
+        }
+        @page {
+          margin: 0;
+          size: auto;
+        }
+      }
+    </style>
+
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-200">
       
       <!-- TOP ACTION BAR & INDICATOR -->
@@ -456,14 +487,45 @@ export interface CartLine {
       (close)="closePrintModal()"
     >
       <!-- Impresión Content -->
-      <div class="bg-gray-100 dark:bg-gray-950 p-4 rounded-xl max-h-[70vh] overflow-y-auto">
+      <div class="bg-gray-100 dark:bg-gray-950 p-4 rounded-xl max-h-[70vh] overflow-y-auto space-y-3">
+        <!-- Selector de Ancho de Papel -->
+        <div class="flex items-center justify-between text-xs bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-gray-150 dark:border-gray-800">
+          <span class="font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-[10px]">Ancho de Papel Térmico</span>
+          <div class="flex gap-1.5">
+            <button 
+              (click)="changePrintWidth(80)"
+              [class.bg-blue-600]="selectedPrintWidth() === 80"
+              [class.text-white]="selectedPrintWidth() === 80"
+              [class.bg-gray-100]="selectedPrintWidth() !== 80"
+              [class.text-gray-700]="selectedPrintWidth() !== 80"
+              [class.dark:bg-gray-800]="selectedPrintWidth() !== 80"
+              [class.dark:text-gray-300]="selectedPrintWidth() !== 80"
+              class="px-3 py-1 rounded-lg font-black text-[10px] transition-all cursor-pointer uppercase tracking-wider"
+            >
+              80mm
+            </button>
+            <button 
+              (click)="changePrintWidth(58)"
+              [class.bg-blue-600]="selectedPrintWidth() === 58"
+              [class.text-white]="selectedPrintWidth() === 58"
+              [class.bg-gray-100]="selectedPrintWidth() !== 58"
+              [class.text-gray-700]="selectedPrintWidth() !== 58"
+              [class.dark:bg-gray-800]="selectedPrintWidth() !== 58"
+              [class.dark:text-gray-300]="selectedPrintWidth() !== 58"
+              class="px-3 py-1 rounded-lg font-black text-[10px] transition-all cursor-pointer uppercase tracking-wider"
+            >
+              58mm
+            </button>
+          </div>
+        </div>
+
         <app-print-preview 
           [order]="activeOrder()"
           [sale]="currentSale()"
           [tableNumber]="tableNumber()"
           [mode]="printMode()"
           [products]="products()"
-          [width]="80"
+          [width]="selectedPrintWidth()"
           [cancelledItems]="cancelledItems()"
         ></app-print-preview>
       </div>
@@ -506,7 +568,7 @@ export interface CartLine {
       <div class="space-y-4 text-sm text-foreground">
         <div>
           <label class="block text-xs font-bold text-gray-400 uppercase mb-1.5">Motivo de Cancelación</label>
-          <select 
+          <select appSelect
             [(ngModel)]="cancellationReason"
             class="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-2.5 font-semibold text-foreground focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
@@ -559,7 +621,9 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private loyaltyApi = inject(LoyaltyApi);
   private cashApi = inject(CashRegisterApi);
   private permissionService = inject(PermissionService);
+  private kitchenApi = inject(KitchenApi);
 
+  public kitchenZones = signal<KitchenZone[]>([]);
   public PERMISSIONS = PERMISSIONS;
   public canCancelItem = computed(() => this.permissionService.hasPermission(this.PERMISSIONS.ORDERS.CANCEL_ITEM));
   public canDeleteItem = computed(() => this.permissionService.hasPermission(this.PERMISSIONS.ORDERS.DELETE_ITEM));
@@ -590,6 +654,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   // Print modal State
   public printModalOpen = signal<boolean>(false);
   public printMode = signal<'pre-cuenta' | 'venta'>('pre-cuenta');
+  public selectedPrintWidth = signal<number>(80);
 
   // Billing Modal State
   public isBillingModalOpen = signal<boolean>(false);
@@ -626,6 +691,15 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   public categories = signal<Category[]>([]);
 
   ngOnInit(): void {
+    const savedWidth = localStorage.getItem('pez-selected-print-width');
+    if (savedWidth) {
+      this.selectedPrintWidth.set(parseInt(savedWidth, 10));
+    }
+    // Cargar zonas de cocina para saber si tienen impresión activada
+    this.kitchenApi.getZones().subscribe({
+      next: (zs) => this.kitchenZones.set(zs)
+    });
+
     // 1. Resolver ID de Mesa desde la URL
     this.route.paramMap.subscribe(params => {
       const idStr = params.get('tableId');
@@ -807,6 +881,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     callObs.subscribe({
       next: () => {
         this.notify.success('Plato anulado con éxito.');
+        this.printCancelTicket(item, reason, detail);
         this.closeCancelModal();
         this.ordersService.loadOrders();
       },
@@ -934,24 +1009,27 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   private addItemsSequentially(orderId: number, lines: CartLine[], waiterId: number): void {
-    // Añadimos recursivamente para garantizar orden o procesamos en batch
-    // Como el endpoint addItems del backend añade en comanda, enviamos las promesas juntas
-    let completedCount = 0;
-    
-    lines.forEach(line => {
-      this.api.addItems(orderId, line.product.id, line.quantity, line.note, waiterId).subscribe({
-        next: () => {
-          completedCount++;
-          if (completedCount === lines.length) {
-            this.handleKitchenSuccess();
-          }
-        },
-        error: () => this.notify.error(`Error al enviar ${line.product.name} a cocina.`)
-      });
+    const payload = lines.map(line => ({
+      productId: line.product.id,
+      quantity: line.quantity,
+      note: line.note || '',
+      waiterId
+    }));
+
+    this.api.addItemsBatch(orderId, payload).subscribe({
+      next: () => {
+        this.handleKitchenSuccess();
+      },
+      error: (err) => {
+        this.notify.error(err.error?.message || 'Error al enviar los platos a cocina.');
+      }
     });
   }
 
   private handleKitchenSuccess(): void {
+    const lines = [...this.cart()];
+    this.printKitchenTickets(lines);
+
     this.cart.set([]); // Limpiar carrito
     this.ordersService.loadOrders(); // Recargar comanda del backend
     
@@ -990,6 +1068,208 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   triggerPrint(): void {
     // Disparar diálogo del navegador
     window.print();
+
+    // Guardar log de auditoría
+    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    const modeName = this.printMode() === 'pre-cuenta' ? 'PRE_CUENTA_PRINT' : 'SALE_PRINT';
+    this.kitchenApi.logAuditEvent(
+      modeName,
+      'billing',
+      stationName,
+      { 
+        orderId: this.activeOrder()?.id, 
+        tableNumber: this.tableNumber(), 
+        totalAmount: this.getOrderTotal() 
+      }
+    ).subscribe();
+  }
+
+  changePrintWidth(w: number): void {
+    this.selectedPrintWidth.set(w);
+    localStorage.setItem('pez-selected-print-width', w.toString());
+  }
+
+  private printKitchenTickets(lines: CartLine[]): void {
+    // Group items by zoneId
+    const groups: { [zoneId: number]: CartLine[] } = {};
+    lines.forEach(line => {
+      const zoneId = (line.product as any).kitchenZoneId || 0;
+      if (!groups[zoneId]) {
+        groups[zoneId] = [];
+      }
+      groups[zoneId].push(line);
+    });
+
+    // For each group, check if printing is enabled
+    Object.keys(groups).forEach(zoneIdStr => {
+      const zoneId = parseInt(zoneIdStr, 10);
+      const zone = this.kitchenZones().find(z => z.id === zoneId);
+      if (zone && zone.printingEnabled) {
+        this.executeKitchenTicketPrint(zone.name, groups[zoneId]);
+      }
+    });
+  }
+
+  private executeKitchenTicketPrint(zoneName: string, items: CartLine[]): void {
+    const tableNum = this.tableNumber();
+    const dateTime = new Date().toLocaleString('es-PE', { hour12: false });
+    const waiterName = this.session.currentUser$() ? `${this.session.currentUser$()?.firstName} ${this.session.currentUser$()?.lastName}` : 'Mozo';
+
+    let itemsHtml = '';
+    items.forEach(it => {
+      itemsHtml += `
+        <tr style="vertical-align: top;">
+          <td style="padding: 4px 0; font-weight: bold;">x${it.quantity}</td>
+          <td style="padding: 4px 0;">
+            <div style="font-weight: bold;">${it.product.name}</div>
+            ${it.note ? `<div style="font-size: 10px; font-style: italic;">* Obs: ${it.note}</div>` : ''}
+          </td>
+        </tr>
+      `;
+    });
+
+    const ticketHtml = `
+      <div style="text-align: center; margin-bottom: 8px;">
+        <h3 style="font-size: 14px; font-weight: 800; margin: 0; text-transform: uppercase;">*** TICKET DE COCINA ***</h3>
+        <h4 style="font-size: 12px; font-weight: bold; margin: 4px 0 0 0; text-transform: uppercase; background: black; color: white; padding: 2px;">ZONA: ${zoneName}</h4>
+        <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      </div>
+      <div style="font-size: 11px; margin-bottom: 6px; line-height: 1.3;">
+        <p style="margin: 2px 0;"><strong>Mesa:</strong> M${tableNum}</p>
+        <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${dateTime}</p>
+        <p style="margin: 2px 0;"><strong>Mozo:</strong> ${waiterName}</p>
+      </div>
+      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      <table style="width: 100%; font-size: 11px; text-align: left; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px dashed black;">
+            <th style="width: 20%; padding-bottom: 4px;">Cant</th>
+            <th style="padding-bottom: 4px;">Producto / Obs</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      <div style="text-align: center; font-size: 9px; margin-top: 8px; font-weight: bold;">
+        [ Fin de Ticket de Cocina ]
+      </div>
+    `;
+
+    const printWidth = localStorage.getItem('pez-selected-print-width') || '80';
+
+    // Create container
+    const container = document.createElement('div');
+    container.className = 'kitchen-ticket-print-container';
+    container.style.setProperty('width', printWidth + 'mm', 'important');
+    container.innerHTML = ticketHtml;
+    document.body.appendChild(container);
+
+    // Trigger Print
+    window.print();
+
+    // Clean up
+    document.body.removeChild(container);
+
+    // Save audit log
+    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    this.kitchenApi.logAuditEvent(
+      'KITCHEN_TICKET_PRINT',
+      'kitchen',
+      stationName,
+      { 
+        zoneName, 
+        tableNumber: tableNum, 
+        items: items.map(it => ({ productId: it.product.id, name: it.product.name, quantity: it.quantity, note: it.note })) 
+      }
+    ).subscribe();
+  }
+
+  private printCancelTicket(item: OrderItem, reason: string, detail: string): void {
+    const prod = this.products().find(p => p.id === item.productId);
+    if (!prod) return;
+
+    const zoneId = (prod as any).kitchenZoneId || 0;
+    const zone = this.kitchenZones().find(z => z.id === zoneId);
+    if (zone && zone.printingEnabled) {
+      this.executeCancelTicketPrint(zone.name, prod.name, item.quantity, reason, detail);
+    }
+  }
+
+  private executeCancelTicketPrint(zoneName: string, productName: string, qty: number, reason: string, detail: string): void {
+    const tableNum = this.tableNumber();
+    const dateTime = new Date().toLocaleString('es-PE', { hour12: false });
+    
+    let reasonText = reason;
+    if (reason === 'WRONG_ORDER') reasonText = 'Error de Pedido';
+    else if (reason === 'CUSTOMER_CHANGED_MIND') reasonText = 'Cambio de Opinión';
+    else if (reason === 'DISH_DELAYED') reasonText = 'Plato Demorado';
+    else if (reason === 'OTHER') reasonText = 'Otro';
+
+    const ticketHtml = `
+      <div style="text-align: center; margin-bottom: 8px;">
+        <h3 style="font-size: 14px; font-weight: 800; margin: 0; text-transform: uppercase; background: black; color: white; padding: 4px;">*** PRODUCTOS CANCELADOS ***</h3>
+        <h4 style="font-size: 12px; font-weight: bold; margin: 4px 0 0 0; text-transform: uppercase;">ZONA: ${zoneName}</h4>
+        <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      </div>
+      <div style="font-size: 11px; margin-bottom: 6px; line-height: 1.3;">
+        <p style="margin: 2px 0;"><strong>Mesa:</strong> M${tableNum}</p>
+        <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${dateTime}</p>
+        <p style="margin: 2px 0;"><strong>Motivo:</strong> ${reasonText}</p>
+        ${detail ? `<p style="margin: 2px 0;"><strong>Detalle:</strong> ${detail}</p>` : ''}
+      </div>
+      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      <table style="width: 100%; font-size: 11px; text-align: left; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px dashed black;">
+            <th style="width: 20%; padding-bottom: 4px;">Cant</th>
+            <th style="padding-bottom: 4px;">Producto</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="vertical-align: top;">
+            <td style="padding: 4px 0; font-weight: bold;">x${qty}</td>
+            <td style="padding: 4px 0; font-weight: bold;">${productName}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
+      <div style="text-align: center; font-size: 9px; margin-top: 8px; font-weight: bold;">
+        [ Cancelación Registrada ]
+      </div>
+    `;
+
+    const printWidth = localStorage.getItem('pez-selected-print-width') || '80';
+
+    // Create container
+    const container = document.createElement('div');
+    container.className = 'kitchen-ticket-print-container';
+    container.style.setProperty('width', printWidth + 'mm', 'important');
+    container.innerHTML = ticketHtml;
+    document.body.appendChild(container);
+
+    // Trigger Print
+    window.print();
+
+    // Clean up
+    document.body.removeChild(container);
+
+    // Save audit log
+    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    this.kitchenApi.logAuditEvent(
+      'KITCHEN_CANCEL_PRINT',
+      'kitchen',
+      stationName,
+      { 
+        zoneName, 
+        tableNumber: tableNum, 
+        productName, 
+        quantity: qty, 
+        reason: reasonText, 
+        detail 
+      }
+    ).subscribe();
   }
 
   triggerPayment(): void {

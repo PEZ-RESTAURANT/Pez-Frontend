@@ -12,11 +12,12 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
 @Component({
   selector: 'app-loyalty-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
 
@@ -90,6 +91,17 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                 />
               </div>
 
+              <!-- Correo Electrónico -->
+              <div>
+                <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Correo Electrónico (Opcional)</label>
+                <input 
+                  type="email" 
+                  [(ngModel)]="registerForm.email"
+                  placeholder="Ej. cliente@gmail.com"
+                  class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-950 dark:text-white focus:outline-none"
+                />
+              </div>
+
               <!-- Birthday -->
               <div>
                 <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Fecha de Cumpleaños (Opcional)</label>
@@ -154,17 +166,32 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-700">
                 <div>
                   <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">{{ cust.fullName }}</h3>
-                  <div class="text-xs font-bold text-gray-400 mt-0.5">
-                    Teléfono: {{ cust.phone }} • Consentimiento: {{ cust.dataConsentDate | date:'dd/MM/yyyy' }}
-                    @if (cust.birthday) {
-                      • Cumpleaños: {{ cust.birthday | date:'dd/MM' }}
-                    }
+                  <div class="text-xs font-bold text-gray-400 mt-0.5 space-y-1">
+                    <div>Teléfono: {{ cust.phone }} • Consentimiento: {{ cust.dataConsentDate | date:'dd/MM/yyyy' }}</div>
+                    <div class="flex flex-wrap gap-2 items-center">
+                      @if (cust.birthday) {
+                        <span>🎂 Cumpleaños: {{ cust.birthday | date:'dd/MM' }}</span>
+                      }
+                      @if (cust.email) {
+                        <span>✉️ Email: {{ cust.email }}</span>
+                      }
+                    </div>
                   </div>
                 </div>
 
-                <div class="p-3 bg-blue-600 text-white rounded-xl text-center min-w-[120px] shadow-xs">
-                  <span class="text-[9px] uppercase font-black tracking-wider block opacity-75">Saldo de Puntos</span>
-                  <span class="text-xl font-black">{{ cust.pointsBalance }} pts</span>
+                <div class="flex flex-col sm:flex-row items-center gap-3">
+                  @if (cust.email) {
+                    <button 
+                      (click)="openPromotionModal()"
+                      class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-750 text-white font-bold text-[10px] uppercase tracking-wider rounded-xl cursor-pointer shadow-xs transition-all shrink-0"
+                    >
+                      ✉️ Enviar Promoción
+                    </button>
+                  }
+                  <div class="p-3 bg-blue-600 text-white rounded-xl text-center min-w-[120px] shadow-xs shrink-0">
+                    <span class="text-[9px] uppercase font-black tracking-wider block opacity-75">Saldo de Puntos</span>
+                    <span class="text-xl font-black">{{ cust.pointsBalance }} pts</span>
+                  </div>
                 </div>
               </div>
 
@@ -261,7 +288,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                       <!-- Service Score -->
                       <div>
                         <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Satisfacción del Servicio (1-5)</label>
-                        <select 
+                        <select appSelect
                           [(ngModel)]="surveyForm.serviceSatisfaction"
                           name="surService"
                           required
@@ -278,7 +305,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                       <!-- Food Score -->
                       <div>
                         <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Satisfacción de la Comida (1-5)</label>
-                        <select 
+                        <select appSelect
                           [(ngModel)]="surveyForm.foodSatisfaction"
                           name="surFood"
                           required
@@ -545,6 +572,56 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         </div>
       </div>
     </app-modal-shell>
+    <!-- ================= MODAL: ENVIAR PROMOCIÓN MANUAL ================= -->
+    <app-modal-shell
+      [open]="isPromotionModalOpen()"
+      title="Enviar Promoción por Correo"
+      [description]="'Redacta un correo promocional para ' + customer()?.fullName"
+      (close)="closePromotionModal()"
+    >
+      <form (submit)="sendPromotion()" class="space-y-4">
+        <div>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">Asunto del Correo *</label>
+          <input 
+            type="text" 
+            required
+            [(ngModel)]="promotionForm.subject"
+            name="promoSubject"
+            placeholder="Ej. ¡Tenemos una oferta especial para ti!"
+            class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-950 dark:text-white focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">Mensaje de la Promoción *</label>
+          <textarea 
+            required
+            [(ngModel)]="promotionForm.message"
+            name="promoMessage"
+            rows="5"
+            placeholder="Redacta el contenido de la promoción..."
+            class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-950 dark:text-white focus:outline-none"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button 
+            type="button" 
+            (click)="closePromotionModal()"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button 
+            type="submit"
+            [disabled]="!promotionForm.subject.trim() || !promotionForm.message.trim()"
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs uppercase tracking-wider"
+          >
+            Enviar Correo
+          </button>
+        </div>
+      </form>
+    </app-modal-shell>
   `
 })
 export class LoyaltyPageComponent implements OnInit {
@@ -581,12 +658,14 @@ export class LoyaltyPageComponent implements OnInit {
   // Modals Visibility
   public isConfigModalOpen = signal<boolean>(false);
   public isDeleteConfirmModalOpen = signal<boolean>(false);
+  public isPromotionModalOpen = signal<boolean>(false);
 
   // Forms Inputs
-  public registerForm = { fullName: '', birthday: '', address: '', dataConsentAccepted: false };
+  public registerForm = { fullName: '', email: '', birthday: '', address: '', dataConsentAccepted: false };
   public pointsToRedeem: number = 0;
   public surveyForm = { favoriteDish: '', favoriteDrink: '', serviceSatisfaction: 5, foodSatisfaction: 5, suggestion: '' };
   public configForm: LoyaltyConfigResource = { minPurchaseAmountForPoints: 0, pointsPerCurrencyUnit: 0, reviewSatisfactionThreshold: 5, googleReviewUrl: '' };
+  public promotionForm = { subject: '', message: '' };
 
   ngOnInit(): void {
     // Check url search query if redirected from tables
@@ -614,7 +693,7 @@ export class LoyaltyPageComponent implements OnInit {
         // If 404, show registration form
         if (err.status === 404) {
           if (this.canRegisterCustomer()) {
-            this.registerForm = { fullName: '', birthday: '', address: '', dataConsentAccepted: false };
+            this.registerForm = { fullName: '', email: '', birthday: '', address: '', dataConsentAccepted: false };
             this.isRegisteringFormVisible.set(true);
           } else {
             this.notify.error('Cliente no encontrado y no posees permisos para registrar.');
@@ -636,7 +715,7 @@ export class LoyaltyPageComponent implements OnInit {
 
   // --- REGISTRATION ---
   submitRegisterCustomer(): void {
-    const { fullName, birthday, address, dataConsentAccepted } = this.registerForm;
+    const { fullName, email, birthday, address, dataConsentAccepted } = this.registerForm;
     const phone = this.searchPhoneInput.trim();
 
     if (!fullName.trim() || !dataConsentAccepted) {
@@ -647,6 +726,7 @@ export class LoyaltyPageComponent implements OnInit {
     this.api.registerCustomer({
       phone,
       fullName: fullName.trim(),
+      email: email.trim() ? email.trim() : undefined,
       birthday: birthday ? birthday : undefined,
       address: address ? address : undefined,
       dataConsentAccepted
@@ -785,5 +865,32 @@ export class LoyaltyPageComponent implements OnInit {
       case 'MANUAL': return 'Manual';
       default: return type;
     }
+  }
+
+  openPromotionModal(): void {
+    this.promotionForm = { subject: '', message: '' };
+    this.isPromotionModalOpen.set(true);
+  }
+
+  closePromotionModal(): void {
+    this.isPromotionModalOpen.set(false);
+  }
+
+  sendPromotion(): void {
+    const cust = this.customer();
+    if (!cust) return;
+    const { subject, message } = this.promotionForm;
+    if (!subject.trim() || !message.trim()) {
+      this.notify.error('Completa todos los campos obligatorios.');
+      return;
+    }
+
+    this.api.sendPromotion(cust.id, subject.trim(), message.trim()).subscribe({
+      next: () => {
+        this.notify.success('Promoción enviada exitosamente.');
+        this.closePromotionModal();
+      },
+      error: (err) => this.notify.error(err.error?.message || 'Error al enviar la promoción.')
+    });
   }
 }

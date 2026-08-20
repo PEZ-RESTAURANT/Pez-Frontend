@@ -16,8 +16,8 @@ import { PERMISSIONS } from '../../core/config/permissions';
     >
       <!-- BRAND LOGO -->
       <div class="h-16 flex items-center justify-center border-b border-gray-200 dark:border-gray-800 shrink-0">
-        <span *ngIf="!isCollapsed()" class="text-xl font-bold text-blue-600 dark:text-blue-400 tracking-wider font-mono">PEZ</span>
-        <span *ngIf="isCollapsed()" class="text-lg font-black text-blue-600 dark:text-blue-400 font-mono">P</span>
+        <span *ngIf="!isCollapsed()" class="text-xl font-bold text-blue-600 dark:text-blue-400 tracking-wider font-mono">Al Toque</span>
+        <span *ngIf="isCollapsed()" class="text-lg font-black text-blue-600 dark:text-blue-400 font-mono">AT</span>
       </div>
 
       <!-- MAIN NAVIGATION -->
@@ -90,6 +90,21 @@ import { PERMISSIONS } from '../../core/config/permissions';
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span *ngIf="!isCollapsed()">Caja</span>
+          </a>
+
+          <!-- Historial de Ventas -->
+          <a
+            *hasPermission="PERMISSIONS.CASHREGISTER.VIEW"
+            routerLink="/app/orders/history"
+            routerLinkActive="bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 font-semibold"
+            [title]="isCollapsed() ? 'Historial de Ventas' : ''"
+            (click)="linkClicked.emit()"
+            class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer text-gray-700 dark:text-gray-300"
+          >
+            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            <span *ngIf="!isCollapsed()">Historial Ventas</span>
           </a>
 
           <!-- Reservas -->

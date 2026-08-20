@@ -7,10 +7,12 @@ import { OrdersApi } from '../../infrastructure/api/orders.api';
 import { RestaurantTable } from '../../domain/models/orders.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+
 @Component({
   selector: 'app-layout-editor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule],
+  imports: [CommonModule, FormsModule, DragDropModule, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
 
@@ -187,7 +189,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
 
                 <div>
                   <label class="block text-[10px] font-black uppercase text-gray-400 mb-1">Piso</label>
-                  <select 
+                  <select appSelect
                     [(ngModel)]="tableForm.floor"
                     name="tFloor"
                     required

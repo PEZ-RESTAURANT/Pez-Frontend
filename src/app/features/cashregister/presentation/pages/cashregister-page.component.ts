@@ -8,13 +8,14 @@ import { NotificationService } from '../../../../core/services/notification.serv
 import { RealtimeService } from '../../../../core/realtime/services/realtime.service';
 import { SessionService } from '../../../../core/auth/services/session.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
-import { Subscription } from 'rxjs';
 import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billing-modal.component';
+import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-cashregister-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent],
+  imports: [CommonModule, FormsModule, ModalShellComponent, BillingModalComponent, SelectDirective],
   template: `
     <div class="p-6 max-w-7xl mx-auto space-y-6">
 
@@ -321,7 +322,7 @@ import { BillingModalComponent } from '../../../../shared/ui/billing-modal/billi
 
         <div>
           <label class="block text-xs font-black uppercase text-gray-400 mb-1">Concepto/Motivo</label>
-          <select 
+          <select appSelect
             [(ngModel)]="manualMovementForm.reason"
             name="reason"
             class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"

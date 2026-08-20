@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -18,7 +18,7 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
         <p class="text-sm text-gray-500">Crea una nueva contraseña segura para tu cuenta</p>
       </div>
 
-      @if (resetSuccess) {
+      @if (resetSuccess()) {
         <div class="p-4 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 rounded-lg text-sm font-semibold space-y-4">
           <p>¡Contraseña actualizada exitosamente!</p>
           <button
@@ -29,9 +29,9 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
             Ir al inicio de sesión
           </button>
         </div>
-      } @else if (tokenError) {
+      } @else if (tokenError()) {
         <div class="p-4 bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-300 rounded-lg text-sm font-semibold space-y-4">
-          <p>{{ errorMessage }}</p>
+          <p>{{ errorMessage() }}</p>
           <a
             routerLink="/auth/forgot-password"
             class="block text-center text-xs text-blue-600 dark:text-blue-400 hover:underline font-bold transition-all"
@@ -68,15 +68,18 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
               required
               autocomplete="new-password"
             />
+            <div *ngIf="password && confirmPassword && password !== confirmPassword" class="text-xs text-red-600 font-bold mt-1">
+              * Las contraseñas no coinciden.
+            </div>
           </div>
 
           <button
             type="submit"
             appButton
             userClass="w-full mt-2"
-            [disabled]="loading"
+            [disabled]="loading()"
           >
-            {{ loading ? 'Actualizando contraseña...' : 'Actualizar contraseña' }}
+            {{ loading() ? 'Actualizando contraseña...' : 'Actualizar contraseña' }}
           </button>
         </form>
       }
@@ -101,10 +104,10 @@ export class ResetPasswordPageComponent implements OnInit {
   token = '';
   password = '';
   confirmPassword = '';
-  loading = false;
-  resetSuccess = false;
-  tokenError = false;
-  errorMessage = '';
+  loading = signal<boolean>(false);
+  resetSuccess = signal<boolean>(false);
+  tokenError = signal<boolean>(false);
+  errorMessage = signal<string>('');
 
   ngOnInit(): void {
     // Leer token de query string
@@ -132,18 +135,18 @@ export class ResetPasswordPageComponent implements OnInit {
       return;
     }
 
-    this.loading = true;
+    this.loading.set(true);
     this.authApi.resetPassword(this.token, this.password).subscribe({
       next: (res) => {
-        this.loading = false;
-        this.resetSuccess = true;
+        this.loading.set(false);
+        this.resetSuccess.set(true);
         this.notifier.success('Contraseña actualizada con éxito.');
       },
       error: (err) => {
-        this.loading = false;
-        this.tokenError = true;
-        this.errorMessage = err.error?.message || 'El enlace de recuperación es inválido o ha expirado.';
-        this.notifier.error(this.errorMessage);
+        this.loading.set(false);
+        this.tokenError.set(true);
+        this.errorMessage.set(err.error?.message || 'El enlace de recuperación es inválido o ha expirado.');
+        this.notifier.error(this.errorMessage());
       }
     });
   }

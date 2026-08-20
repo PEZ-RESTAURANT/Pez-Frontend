@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -18,9 +18,9 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
         <p class="text-sm text-gray-500">Ingresa tu correo para recibir las instrucciones</p>
       </div>
 
-      @if (submitted) {
+      @if (submitted()) {
         <div class="p-4 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 rounded-lg text-sm font-semibold space-y-3">
-          <p>{{ statusMessage }}</p>
+          <p>{{ statusMessage() }}</p>
           <p class="text-xs text-gray-500 font-normal">Revisa tu bandeja de entrada o la consola del servidor si estás en desarrollo.</p>
         </div>
       } @else {
@@ -43,9 +43,9 @@ import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
             type="submit"
             appButton
             userClass="w-full mt-2"
-            [disabled]="loading"
+            [disabled]="loading()"
           >
-            {{ loading ? 'Enviando instrucciones...' : 'Enviar instrucciones' }}
+            {{ loading() ? 'Enviando instrucciones...' : 'Enviar instrucciones' }}
           </button>
         </form>
       }
@@ -69,24 +69,24 @@ export class ForgotPasswordPageComponent {
   private notifier = inject(NotificationService);
 
   email = '';
-  loading = false;
-  submitted = false;
-  statusMessage = '';
+  loading = signal<boolean>(false);
+  submitted = signal<boolean>(false);
+  statusMessage = signal<string>('');
 
   onSubmit(event: Event): void {
     event.preventDefault();
     if (!this.email) return;
 
-    this.loading = true;
+    this.loading.set(true);
     this.authApi.forgotPassword(this.email).subscribe({
       next: (res) => {
-        this.loading = false;
-        this.submitted = true;
-        this.statusMessage = res.message;
+        this.loading.set(false);
+        this.submitted.set(true);
+        this.statusMessage.set(res.message);
         this.notifier.success('Instrucciones enviadas correctamente.');
       },
       error: (err) => {
-        this.loading = false;
+        this.loading.set(false);
         const msg = err.error?.message || 'Ocurrió un error al procesar tu solicitud.';
         this.notifier.error(msg);
       }

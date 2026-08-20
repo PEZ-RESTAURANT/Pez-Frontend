@@ -1,4 +1,4 @@
-import { Component, Input, HostBinding } from '@angular/core';
+import { Component, Input, HostBinding, Attribute } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { cn } from '../../utils/cn';
 
@@ -12,6 +12,8 @@ export class ButtonDirective {
   @Input() variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' = 'default';
   @Input() size: 'default' | 'sm' | 'lg' | 'icon' = 'default';
   @Input() userClass: string = '';
+
+  constructor(@Attribute('class') private staticClass: string) {}
 
   @HostBinding('class')
   get hostClasses(): string {
@@ -29,6 +31,7 @@ export class ButtonDirective {
         'h-11 rounded-md px-8': this.size === 'lg',
         'h-10 w-10 p-0': this.size === 'icon',
       },
+      this.staticClass,
       this.userClass
     );
   }
