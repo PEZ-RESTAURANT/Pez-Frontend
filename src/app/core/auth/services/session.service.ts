@@ -10,8 +10,8 @@ export interface UserSession {
 
 @Injectable({ providedIn: 'root' })
 export class SessionService {
-  private readonly TOKEN_KEY = 'pez-auth-token';
-  private readonly USER_KEY = 'pez-auth-user';
+  private readonly TOKEN_KEY = 'altoque-auth-token';
+  private readonly USER_KEY = 'altoque-auth-user';
 
   private _currentUser = signal<UserSession | null>(null);
   private _isAuthenticated = signal<boolean>(false);

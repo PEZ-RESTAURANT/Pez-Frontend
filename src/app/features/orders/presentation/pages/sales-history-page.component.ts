@@ -11,6 +11,9 @@ import { PrintPreviewComponent } from '../components/print-preview.component';
 import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 import { InputDirective } from '../../../../shared/ui/input/input.directive';
 import { ButtonDirective } from '../../../../shared/ui/button/button.directive';
+import { PrintAgentService } from '../../../../core/printing/print-agent.service';
+import { AuthApi } from '../../../auth/infrastructure/api/auth.api';
+import { SessionService } from '../../../../core/auth/services/session.service';
 
 @Component({
   selector: 'app-sales-history-page',
@@ -496,6 +499,9 @@ export class SalesHistoryPageComponent implements OnInit {
   public PERMISSIONS = PERMISSIONS;
   private api = inject(CashRegisterApi);
   private permissionService = inject(PermissionService);
+  private printAgent = inject(PrintAgentService);
+  private authApi = inject(AuthApi);
+  private session = inject(SessionService);
 
   // States
   sales = signal<Sale[]>([]);
@@ -720,7 +726,53 @@ export class SalesHistoryPageComponent implements OnInit {
   }
 
   printTicket() {
-    window.print();
+    const sale = this.selectedSale();
+    if (!sale) return;
+
+    this.printAgent.checkAgentStatus().subscribe(isAlive => {
+      if (isAlive) {
+        const restaurantId = this.session.getRestaurantId();
+        if (restaurantId) {
+          this.authApi.getRestaurant(restaurantId).subscribe({
+            next: (resInfo) => {
+              const fakeOrder = this.getReprintFakeOrder(sale);
+              const ops = this.printAgent.formatReceipt(
+                resInfo,
+                fakeOrder,
+                sale,
+                'venta',
+                0
+              );
+              this.printAgent.sendPrintJob(ops).subscribe({
+                next: () => this.isReprintOpen.set(false),
+                error: () => alert('Error al reimprimir el comprobante.')
+              });
+            },
+            error: () => {
+              const defaultInfo = {
+                name: this.session.getRestaurantName() || 'RESTAURANTE AL TOQUE',
+                address: 'AV. PRINCIPAL 123',
+                businessDocumentNumber: '20123456789',
+                contactPhone: '(01) 444-5555'
+              };
+              const fakeOrder = this.getReprintFakeOrder(sale);
+              const ops = this.printAgent.formatReceipt(
+                defaultInfo,
+                fakeOrder,
+                sale,
+                'venta',
+                0
+              );
+              this.printAgent.sendPrintJob(ops).subscribe({
+                next: () => this.isReprintOpen.set(false)
+              });
+            }
+          });
+        }
+      } else {
+        alert('Al Toque Print Agent no está corriendo en este dispositivo. No se puede imprimir físicamente.');
+      }
+    });
   }
 
   // Reprint Mappers for PrintPreviewComponent

@@ -11,6 +11,9 @@ import { PrintPreviewComponent } from '../../../features/orders/presentation/com
 import { LookupApi } from '../../../features/billing/infrastructure/api/lookup.api';
 import { SelectOnFocusDirective } from '../../../shared/utils/select-on-focus.directive';
 import { SelectDirective } from '../select/select.directive';
+import { PrintAgentService } from '../../../core/printing/print-agent.service';
+import { AuthApi } from '../../../features/auth/infrastructure/api/auth.api';
+import { SessionService } from '../../../core/auth/services/session.service';
 
 @Component({
   selector: 'app-billing-modal',
@@ -277,6 +280,9 @@ export class BillingModalComponent implements OnInit, OnChanges {
   private ordersService = inject(OrdersService);
   private ordersApi = inject(OrdersApi);
   private lookupApi = inject(LookupApi);
+  private printAgent = inject(PrintAgentService);
+  private authApi = inject(AuthApi);
+  private session = inject(SessionService);
 
   public products = signal<Product[]>([]);
   public completedSale = signal<Sale | null>(null);
@@ -363,7 +369,7 @@ export class BillingModalComponent implements OnInit, OnChanges {
     // Validar si ya existe una venta PENDING para esta comanda
     this.api.getSales().subscribe({
       next: (sales) => {
-        const existing = sales.find(s => s.orderId === this.order!.id && s.status === 'PENDING');
+        const existing = sales.find(s => s.orderId === this.order!.id && (s.status === 'PENDING' || s.status === 'ISSUED_UNPAID'));
         if (existing) {
           this.currentSaleId = existing.id;
           this.selectedOrderSaleTotal.set(existing.totalAmount);
@@ -538,7 +544,46 @@ export class BillingModalComponent implements OnInit, OnChanges {
   }
 
   triggerPrint(): void {
-    window.print();
+    this.printAgent.checkAgentStatus().subscribe(isAlive => {
+      if (isAlive) {
+        const restaurantId = this.session.getRestaurantId();
+        if (restaurantId) {
+          this.authApi.getRestaurant(restaurantId).subscribe({
+            next: (resInfo) => {
+              const ops = this.printAgent.formatReceipt(
+                resInfo,
+                this.order,
+                this.completedSale(),
+                'venta',
+                this.getTableNumber(this.order?.tableId)
+              );
+              this.printAgent.sendPrintJob(ops).subscribe({
+                next: () => this.notify.success('Comprobante enviado a la impresora local.'),
+                error: () => this.notify.error('Error al enviar el comprobante a la impresora.')
+              });
+            },
+            error: () => {
+              const defaultInfo = {
+                name: this.session.getRestaurantName() || 'RESTAURANTE AL TOQUE',
+                address: 'AV. PRINCIPAL 123',
+                businessDocumentNumber: '20123456789',
+                contactPhone: '(01) 444-5555'
+              };
+              const ops = this.printAgent.formatReceipt(
+                defaultInfo,
+                this.order,
+                this.completedSale(),
+                'venta',
+                this.getTableNumber(this.order?.tableId)
+              );
+              this.printAgent.sendPrintJob(ops).subscribe();
+            }
+          });
+        }
+      } else {
+        this.notify.warning('Al Toque Print Agent no está activo. Se completó el cobro pero no se pudo imprimir físicamente.');
+      }
+    });
   }
 
   getOrderTotal(order: Order): number {

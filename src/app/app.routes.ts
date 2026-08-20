@@ -63,16 +63,16 @@ export const routes: Routes = [
         data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
       },
       {
-        path: 'orders/:tableId',
-        loadComponent: () => import('./features/orders/presentation/pages/order-detail-page.component').then(m => m.OrderDetailPageComponent),
-        canActivate: [permissionGuard],
-        data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
-      },
-      {
         path: 'orders/history',
         loadComponent: () => import('./features/orders/presentation/pages/sales-history-page.component').then(m => m.SalesHistoryPageComponent),
         canActivate: [permissionGuard],
         data: { permission: PERMISSIONS.CASHREGISTER.VIEW }
+      },
+      {
+        path: 'orders/:tableId',
+        loadComponent: () => import('./features/orders/presentation/pages/order-detail-page.component').then(m => m.OrderDetailPageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.ORDERS.VIEW_TABLE_MAP }
       },
       {
         path: 'kitchen',

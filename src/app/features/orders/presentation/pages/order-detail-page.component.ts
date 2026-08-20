@@ -8,6 +8,7 @@ import { CatalogApi, Category } from '../../../catalog/infrastructure/api/catalo
 import { Product, Order, OrderItem } from '../../domain/models/orders.model';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { SessionService } from '../../../../core/auth/services/session.service';
+import { AuthApi } from '../../../auth/infrastructure/api/auth.api';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 import { PrintPreviewComponent } from '../components/print-preview.component';
 import { environment } from '../../../../../environments/environment';
@@ -20,6 +21,7 @@ import { PermissionService } from '../../../../core/auth/services/permission.ser
 import { PERMISSIONS } from '../../../../core/config/permissions';
 import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
 import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+import { PrintAgentService } from '../../../../core/printing/print-agent.service';
 
 export interface CartLine {
   product: Product;
@@ -622,6 +624,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private cashApi = inject(CashRegisterApi);
   private permissionService = inject(PermissionService);
   private kitchenApi = inject(KitchenApi);
+  private printAgent = inject(PrintAgentService);
+  private authApi = inject(AuthApi);
 
   public kitchenZones = signal<KitchenZone[]>([]);
   public PERMISSIONS = PERMISSIONS;
@@ -691,10 +695,8 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   public categories = signal<Category[]>([]);
 
   ngOnInit(): void {
-    const savedWidth = localStorage.getItem('pez-selected-print-width');
-    if (savedWidth) {
-      this.selectedPrintWidth.set(parseInt(savedWidth, 10));
-    }
+    const savedWidth = this.printAgent.getSelectedWidth();
+    this.selectedPrintWidth.set(savedWidth);
     // Cargar zonas de cocina para saber si tienen impresión activada
     this.kitchenApi.getZones().subscribe({
       next: (zs) => this.kitchenZones.set(zs)
@@ -1066,11 +1068,50 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
   }
 
   triggerPrint(): void {
-    // Disparar diálogo del navegador
-    window.print();
+    // 1. Verificar estado del agente de impresión
+    this.printAgent.checkAgentStatus().subscribe(isAlive => {
+      if (isAlive) {
+        const restaurantId = this.session.getRestaurantId();
+        if (restaurantId) {
+          this.authApi.getRestaurant(restaurantId).subscribe({
+            next: (resInfo) => {
+              const ops = this.printAgent.formatReceipt(
+                resInfo,
+                this.activeOrder(),
+                this.currentSale(),
+                this.printMode(),
+                this.tableNumber()
+              );
+              this.printAgent.sendPrintJob(ops).subscribe({
+                next: () => this.notify.success('Ticket enviado a la impresora local.'),
+                error: () => this.notify.error('Error al imprimir. Verifique la ticketera.')
+              });
+            },
+            error: () => {
+              const defaultInfo = {
+                name: this.session.getRestaurantName() || 'RESTAURANTE AL TOQUE',
+                address: 'AV. PRINCIPAL 123',
+                businessDocumentNumber: '20123456789',
+                contactPhone: '(01) 444-5555'
+              };
+              const ops = this.printAgent.formatReceipt(
+                defaultInfo,
+                this.activeOrder(),
+                this.currentSale(),
+                this.printMode(),
+                this.tableNumber()
+              );
+              this.printAgent.sendPrintJob(ops).subscribe();
+            }
+          });
+        }
+      } else {
+        this.notify.warning('Al Toque Print Agent no está corriendo en este dispositivo. Se continuará con la operación sin impresión física.');
+      }
+    });
 
     // Guardar log de auditoría
-    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    const stationName = this.printAgent.getSelectedPrinter() || 'Dispositivo Mozo';
     const modeName = this.printMode() === 'pre-cuenta' ? 'PRE_CUENTA_PRINT' : 'SALE_PRINT';
     this.kitchenApi.logAuditEvent(
       modeName,
@@ -1086,7 +1127,7 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   changePrintWidth(w: number): void {
     this.selectedPrintWidth.set(w);
-    localStorage.setItem('pez-selected-print-width', w.toString());
+    this.printAgent.saveSelectedWidth(w);
   }
 
   private printKitchenTickets(lines: CartLine[]): void {
@@ -1112,68 +1153,21 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private executeKitchenTicketPrint(zoneName: string, items: CartLine[]): void {
     const tableNum = this.tableNumber();
-    const dateTime = new Date().toLocaleString('es-PE', { hour12: false });
     const waiterName = this.session.currentUser$() ? `${this.session.currentUser$()?.firstName} ${this.session.currentUser$()?.lastName}` : 'Mozo';
 
-    let itemsHtml = '';
-    items.forEach(it => {
-      itemsHtml += `
-        <tr style="vertical-align: top;">
-          <td style="padding: 4px 0; font-weight: bold;">x${it.quantity}</td>
-          <td style="padding: 4px 0;">
-            <div style="font-weight: bold;">${it.product.name}</div>
-            ${it.note ? `<div style="font-size: 10px; font-style: italic;">* Obs: ${it.note}</div>` : ''}
-          </td>
-        </tr>
-      `;
+    this.printAgent.checkAgentStatus().subscribe(isAlive => {
+      if (isAlive) {
+        const ops = this.printAgent.formatKitchenTicket(zoneName, tableNum, waiterName, items);
+        this.printAgent.sendPrintJob(ops).subscribe({
+          error: (err) => console.error('Error al imprimir ticket de cocina:', err)
+        });
+      } else {
+        this.notify.warning(`Al Toque Print Agent no responde. No se pudo imprimir la comanda de cocina para la zona: ${zoneName}.`);
+      }
     });
 
-    const ticketHtml = `
-      <div style="text-align: center; margin-bottom: 8px;">
-        <h3 style="font-size: 14px; font-weight: 800; margin: 0; text-transform: uppercase;">*** TICKET DE COCINA ***</h3>
-        <h4 style="font-size: 12px; font-weight: bold; margin: 4px 0 0 0; text-transform: uppercase; background: black; color: white; padding: 2px;">ZONA: ${zoneName}</h4>
-        <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      </div>
-      <div style="font-size: 11px; margin-bottom: 6px; line-height: 1.3;">
-        <p style="margin: 2px 0;"><strong>Mesa:</strong> M${tableNum}</p>
-        <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${dateTime}</p>
-        <p style="margin: 2px 0;"><strong>Mozo:</strong> ${waiterName}</p>
-      </div>
-      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      <table style="width: 100%; font-size: 11px; text-align: left; border-collapse: collapse;">
-        <thead>
-          <tr style="border-bottom: 1px dashed black;">
-            <th style="width: 20%; padding-bottom: 4px;">Cant</th>
-            <th style="padding-bottom: 4px;">Producto / Obs</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemsHtml}
-        </tbody>
-      </table>
-      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      <div style="text-align: center; font-size: 9px; margin-top: 8px; font-weight: bold;">
-        [ Fin de Ticket de Cocina ]
-      </div>
-    `;
-
-    const printWidth = localStorage.getItem('pez-selected-print-width') || '80';
-
-    // Create container
-    const container = document.createElement('div');
-    container.className = 'kitchen-ticket-print-container';
-    container.style.setProperty('width', printWidth + 'mm', 'important');
-    container.innerHTML = ticketHtml;
-    document.body.appendChild(container);
-
-    // Trigger Print
-    window.print();
-
-    // Clean up
-    document.body.removeChild(container);
-
     // Save audit log
-    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    const stationName = this.printAgent.getSelectedPrinter() || 'Dispositivo Mozo';
     this.kitchenApi.logAuditEvent(
       'KITCHEN_TICKET_PRINT',
       'kitchen',
@@ -1199,7 +1193,6 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
 
   private executeCancelTicketPrint(zoneName: string, productName: string, qty: number, reason: string, detail: string): void {
     const tableNum = this.tableNumber();
-    const dateTime = new Date().toLocaleString('es-PE', { hour12: false });
     
     let reasonText = reason;
     if (reason === 'WRONG_ORDER') reasonText = 'Error de Pedido';
@@ -1207,56 +1200,19 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
     else if (reason === 'DISH_DELAYED') reasonText = 'Plato Demorado';
     else if (reason === 'OTHER') reasonText = 'Otro';
 
-    const ticketHtml = `
-      <div style="text-align: center; margin-bottom: 8px;">
-        <h3 style="font-size: 14px; font-weight: 800; margin: 0; text-transform: uppercase; background: black; color: white; padding: 4px;">*** PRODUCTOS CANCELADOS ***</h3>
-        <h4 style="font-size: 12px; font-weight: bold; margin: 4px 0 0 0; text-transform: uppercase;">ZONA: ${zoneName}</h4>
-        <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      </div>
-      <div style="font-size: 11px; margin-bottom: 6px; line-height: 1.3;">
-        <p style="margin: 2px 0;"><strong>Mesa:</strong> M${tableNum}</p>
-        <p style="margin: 2px 0;"><strong>Fecha/Hora:</strong> ${dateTime}</p>
-        <p style="margin: 2px 0;"><strong>Motivo:</strong> ${reasonText}</p>
-        ${detail ? `<p style="margin: 2px 0;"><strong>Detalle:</strong> ${detail}</p>` : ''}
-      </div>
-      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      <table style="width: 100%; font-size: 11px; text-align: left; border-collapse: collapse;">
-        <thead>
-          <tr style="border-bottom: 1px dashed black;">
-            <th style="width: 20%; padding-bottom: 4px;">Cant</th>
-            <th style="padding-bottom: 4px;">Producto</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="vertical-align: top;">
-            <td style="padding: 4px 0; font-weight: bold;">x${qty}</td>
-            <td style="padding: 4px 0; font-weight: bold;">${productName}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div style="border-bottom: 1px dashed black; margin: 6px 0;"></div>
-      <div style="text-align: center; font-size: 9px; margin-top: 8px; font-weight: bold;">
-        [ Cancelación Registrada ]
-      </div>
-    `;
-
-    const printWidth = localStorage.getItem('pez-selected-print-width') || '80';
-
-    // Create container
-    const container = document.createElement('div');
-    container.className = 'kitchen-ticket-print-container';
-    container.style.setProperty('width', printWidth + 'mm', 'important');
-    container.innerHTML = ticketHtml;
-    document.body.appendChild(container);
-
-    // Trigger Print
-    window.print();
-
-    // Clean up
-    document.body.removeChild(container);
+    this.printAgent.checkAgentStatus().subscribe(isAlive => {
+      if (isAlive) {
+        const ops = this.printAgent.formatCancellationTicket(zoneName, tableNum, productName, qty, reasonText, detail);
+        this.printAgent.sendPrintJob(ops).subscribe({
+          error: (err) => console.error('Error al imprimir ticket de cancelación:', err)
+        });
+      } else {
+        this.notify.warning(`Al Toque Print Agent no responde. No se pudo imprimir el ticket de cancelación para cocina.`);
+      }
+    });
 
     // Save audit log
-    const stationName = localStorage.getItem('pez-selected-print-station') || 'Dispositivo Mozo';
+    const stationName = this.printAgent.getSelectedPrinter() || 'Dispositivo Mozo';
     this.kitchenApi.logAuditEvent(
       'KITCHEN_CANCEL_PRINT',
       'kitchen',

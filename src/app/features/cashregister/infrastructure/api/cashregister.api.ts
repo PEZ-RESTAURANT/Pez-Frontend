@@ -111,6 +111,7 @@ export class CashRegisterApi extends BaseApiService {
     return this.http.get<Sale[]>(`${this.baseUrl}/sales`).pipe(
       map(sales => sales.map(s => ({
         ...s,
+        status: s.status || (s as any).saleStatus,
         totalAmount: s.totalAmount ?? s.total ?? 0
       })))
     );
@@ -122,6 +123,7 @@ export class CashRegisterApi extends BaseApiService {
     }).pipe(
       map(sales => sales.map(s => ({
         ...s,
+        status: s.status || (s as any).saleStatus,
         totalAmount: s.totalAmount ?? s.total ?? 0
       })))
     );
@@ -148,6 +150,7 @@ export class CashRegisterApi extends BaseApiService {
     }).pipe(
       map(sales => sales.map(s => ({
         ...s,
+        status: s.status || (s as any).saleStatus,
         totalAmount: s.totalAmount ?? s.total ?? 0
       })))
     );

@@ -5,6 +5,7 @@ import { KitchenApi, KitchenZone, PrintStation } from '../../infrastructure/api/
 import { NotificationService } from '../../../../core/services/notification.service';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
 import { SelectDirective } from '../../../../shared/ui/select/select.directive';
+import { PrintAgentService } from '../../../../core/printing/print-agent.service';
 
 @Component({
   selector: 'app-kitchen-zones-page',
@@ -103,28 +104,72 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
       </div>
 
       <!-- ================= PUESTO DE ESTE DISPOSITIVO ================= -->
-      <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 shadow-sm p-6 space-y-4">
-        <div>
-          <h3 class="text-lg font-extrabold text-gray-900 dark:text-white">Este Dispositivo</h3>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Asigna este navegador/dispositivo a una estación de impresión para auditar y rastrear quién originó cada ticket.
-          </p>
-        </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Puesto de Auditoría -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Estación de Auditoría</h3>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              Asigna este navegador a un puesto para auditar y rastrear quién originó cada comanda.
+            </p>
+          </div>
 
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 max-w-xl">
-          <select appSelect
-            [(ngModel)]="selectedStationName"
-            (change)="saveSelectedStation()"
-            class="w-full sm:w-64 px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">-- Sin Puesto Asignado --</option>
-            @for (station of stations(); track station.id) {
-              <option [value]="station.name">{{ station.name }}</option>
-            }
-          </select>
-          <div class="flex items-center text-xs font-bold text-emerald-600 gap-1.5 mt-2 sm:mt-0" *ngIf="selectedStationName()">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full">
+            <select appSelect
+              [(ngModel)]="selectedStationName"
+              (change)="saveSelectedStation()"
+              class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Sin Puesto Asignado --</option>
+              @for (station of stations(); track station.id) {
+                <option [value]="station.name">{{ station.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="flex items-center text-xs font-bold text-emerald-600 gap-1.5" *ngIf="selectedStationName()">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
             Asignado a: {{ selectedStationName() }}
+          </div>
+        </div>
+
+        <!-- Impresora Física del Terminal -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700 shadow-sm p-6 space-y-4">
+          <div>
+            <h3 class="text-base font-extrabold text-gray-900 dark:text-white">Ticketera Física Local</h3>
+            <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+              Selecciona la ticketera (USB directo WinUSB o Spooler) conectada localmente a este equipo.
+            </p>
+          </div>
+
+          <div class="flex flex-col gap-3 w-full">
+            @if (!agentActive()) {
+              <div class="text-xs font-bold text-amber-600 dark:text-amber-400 py-2">
+                ⚠️ Al Toque Print Agent no está corriendo en este equipo. Inícialo para configurar.
+              </div>
+            } @else {
+              <select appSelect
+                [(ngModel)]="selectedPrinterName"
+                (change)="saveSelectedPrinter()"
+                class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Sin Impresora Local --</option>
+                @for (pr of localPrinters(); track pr) {
+                  <option [value]="pr">{{ pr }}</option>
+                }
+              </select>
+              
+              <button
+                (click)="detectUsbPrinters()"
+                [disabled]="detecting()"
+                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+              >
+                <svg *ngIf="detecting()" class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>{{ detecting() ? 'Esperando autorización UAC...' : 'Detectar Impresoras USB (WinUSB)' }}</span>
+              </button>
+            }
           </div>
         </div>
       </div>
@@ -238,11 +283,18 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 export class KitchenZonesPageComponent implements OnInit {
   private api = inject(KitchenApi);
   private notify = inject(NotificationService);
+  private printAgent = inject(PrintAgentService);
 
   public zones = signal<KitchenZone[]>([]);
   public stations = signal<PrintStation[]>([]);
   public selectedStationName = signal<string>('');
   public newStationName = '';
+
+  // Configuración de impresora local
+  public agentActive = signal<boolean>(false);
+  public localPrinters = signal<string[]>([]);
+  public selectedPrinterName = '';
+  public detecting = signal<boolean>(false);
 
   public isModalOpen = signal<boolean>(false);
   public editMode = signal<boolean>(false);
@@ -252,8 +304,52 @@ export class KitchenZonesPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadZones();
     this.loadStations();
-    const savedStation = localStorage.getItem('pez-selected-print-station') || '';
+    const savedStation = localStorage.getItem('altoque-selected-print-station') || '';
     this.selectedStationName.set(savedStation);
+    this.checkAgentAndLoadPrinters();
+  }
+
+  checkAgentAndLoadPrinters(): void {
+    this.printAgent.checkAgentStatus().subscribe({
+      next: (active) => {
+        this.agentActive.set(active);
+        if (active) {
+          this.printAgent.getSystemPrinters().subscribe({
+            next: (list) => {
+              this.localPrinters.set(list);
+              this.selectedPrinterName = this.printAgent.getSelectedPrinter();
+            }
+          });
+        }
+      }
+    });
+  }
+
+  saveSelectedPrinter(): void {
+    this.printAgent.saveSelectedPrinter(this.selectedPrinterName);
+    this.notify.success('Impresora local asignada a este terminal.');
+  }
+
+  detectUsbPrinters(): void {
+    this.detecting.set(true);
+    this.notify.info('Solicitando vinculación de driver WinUSB. Confirma la autorización de administrador (UAC).');
+    
+    this.printAgent.detectNewPrinters().subscribe({
+      next: (res) => {
+        this.detecting.set(false);
+        if (res && res.success) {
+          this.notify.success(res.message || 'Vinculación de driver WinUSB completada.');
+          this.checkAgentAndLoadPrinters();
+        } else {
+          this.notify.error(res?.error || 'Error al vincular el driver.');
+        }
+      },
+      error: (err) => {
+        this.detecting.set(false);
+        const errMsg = err.error?.error || err.error?.message || 'Autorización denegada (UAC cancelado) o error del agente.';
+        this.notify.error(errMsg);
+      }
+    });
   }
 
   loadZones(): void {
@@ -290,7 +386,7 @@ export class KitchenZonesPageComponent implements OnInit {
         this.notify.success('Estación eliminada.');
         if (this.selectedStationName() === station.name) {
           this.selectedStationName.set('');
-          localStorage.removeItem('pez-selected-print-station');
+          localStorage.removeItem('altoque-selected-print-station');
         }
         this.loadStations();
       },
@@ -299,7 +395,7 @@ export class KitchenZonesPageComponent implements OnInit {
   }
 
   saveSelectedStation(): void {
-    localStorage.setItem('pez-selected-print-station', this.selectedStationName());
+    localStorage.setItem('altoque-selected-print-station', this.selectedStationName());
     this.notify.success('Estación predeterminada asignada a este navegador.');
   }
 

@@ -262,7 +262,7 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
       next: (zs) => {
         this.zones.set(zs);
 
-        const stored = localStorage.getItem('pez-kds-zone-id');
+        const stored = localStorage.getItem('altoque-kds-zone-id');
         if (stored) {
           const id = parseInt(stored, 10);
           if (zs.some(z => z.id === id)) {
@@ -287,7 +287,7 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
 
   selectZone(zoneId: number): void {
     this.selectedZoneId.set(zoneId);
-    localStorage.setItem('pez-kds-zone-id', zoneId.toString());
+    localStorage.setItem('altoque-kds-zone-id', zoneId.toString());
     this.loadQueue();
   }
 
