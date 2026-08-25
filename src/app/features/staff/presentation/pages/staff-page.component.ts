@@ -1,6 +1,9 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import { environment } from '../../../../../environments/environment';
+import { RealtimeService } from '../../../../core/realtime/services/realtime.service';
 import { 
   StaffApi, 
   StaffProfile, 
@@ -14,6 +17,8 @@ import {
 import { NotificationService } from '../../../../core/services/notification.service';
 import { PermissionService } from '../../../../core/auth/services/permission.service';
 import { PERMISSIONS } from '../../../../core/config/permissions';
+import { PrintAgentService } from '../../../../core/printing/print-agent.service';
+import { SessionService } from '../../../../core/auth/services/session.service';
 import { SelectOnFocusDirective } from '../../../../shared/utils/select-on-focus.directive';
 import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.component';
@@ -37,12 +42,20 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         </div>
 
         @if (canManageProfiles()) {
-          <button 
-            (click)="openCreateProfileModal()"
-            class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-all self-start md:self-auto uppercase tracking-wider"
-          >
-            + Nuevo Perfil de Personal
-          </button>
+          <div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <button 
+              (click)="openFingerprintSettingsModal()"
+              class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer border border-gray-200 dark:border-gray-700 transition-all uppercase tracking-wider flex items-center gap-1.5"
+            >
+              <span>⚙️ Configurar Huellero</span>
+            </button>
+            <button 
+              (click)="openCreateProfileModal()"
+              class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-all uppercase tracking-wider"
+            >
+              + Nuevo Perfil de Personal
+            </button>
+          </div>
         }
       </div>
 
@@ -141,7 +154,7 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
                     {{ u ? (u.firstName + ' ' + u.lastName) : 'Cargando...' }}
                   </h3>
                   <div class="text-xs font-bold text-gray-400 mt-0.5">
-                    {{ u?.email }} • Contrato de pago {{ translatePaymentType(prof.paymentType) }} (S/ {{ prof.agreedAmount | number:'1.2-2' }})
+                    {{ u?.email }} • Contrato de pago {{ translatePaymentType(prof.paymentType) }} (S/ {{ prof.agreedAmount | number:'1.2-2' }}) • Huella ID: {{ prof.fingerprintId || 'No asignada' }}
                   </div>
                 </div>
 
@@ -409,44 +422,112 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
               <!-- ================= TAB CONTENT 5: RESUMEN DE PAGO ================= -->
               @if (activeTab() === 'summary') {
                 <div class="space-y-4">
-                  <h4 class="text-xs font-black uppercase text-gray-400 tracking-wider mb-2">Resumen de Liquidación Pendiente</h4>
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-black uppercase text-gray-400 tracking-wider">Resumen de Liquidación Pendiente</h4>
+                    <button 
+                      (click)="saveRates()"
+                      class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider cursor-pointer"
+                    >
+                      Guardar Tarifas
+                    </button>
+                  </div>
 
                   @if (summary(); as summ) {
-                    <div class="grid grid-cols-2 gap-4">
-                      <!-- Agreed Amount -->
-                      <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-150 dark:border-gray-800 flex flex-col justify-between">
-                        <span class="text-[10px] uppercase font-black tracking-wider text-gray-400">Monto Base Acordado</span>
-                        <span class="text-lg font-black text-gray-900 dark:text-white mt-1">S/ {{ summ.agreedAmount | number:'1.2-2' }}</span>
+                    <div class="space-y-4">
+                      <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-150 dark:border-gray-800 space-y-3">
+                        
+                        <!-- Base Line -->
+                        @if (prof.paymentType === 'HOURLY') {
+                          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                            <div>
+                              <div class="text-xs font-bold text-gray-900 dark:text-white">Horas Regulares Cumplidas</div>
+                              <div class="text-[10px] text-gray-400">Sumatoria de asistencias completadas y validadas</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span class="text-xs font-bold text-gray-500">{{ summ.regularHours | number:'1.1-2' }} hrs x S/</span>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                [(ngModel)]="editedAgreedAmount" 
+                                class="w-20 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded text-center text-xs font-bold focus:outline-none"
+                              />
+                              <span class="text-xs font-black text-gray-900 dark:text-white ml-2">
+                                S/ {{ (summ.regularHours * editedAgreedAmount()) | number:'1.2-2' }}
+                              </span>
+                            </div>
+                          </div>
+                        } @else {
+                          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                            <div>
+                              <div class="text-xs font-bold text-gray-900 dark:text-white">Monto Fijo Acordado</div>
+                              <div class="text-[10px] text-gray-400">Sueldo base del contrato ({{ translatePaymentType(prof.paymentType) }})</div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span class="text-xs font-bold text-gray-500">S/</span>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                [(ngModel)]="editedAgreedAmount" 
+                                class="w-24 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded text-center text-xs font-bold focus:outline-none"
+                              />
+                              <span class="text-xs font-black text-gray-900 dark:text-white ml-2">
+                                S/ {{ editedAgreedAmount() | number:'1.2-2' }}
+                              </span>
+                            </div>
+                          </div>
+                        }
+
+                        <!-- Overtime Line -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+                          <div>
+                            <div class="text-xs font-bold text-gray-900 dark:text-white">Horas Extra Registradas</div>
+                            <div class="text-[10px] text-gray-400">Sumatoria de horas extra manuales aprobadas</div>
+                          </div>
+                          <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-500">{{ summ.totalOvertimeHours | number:'1.1-2' }} hrs x S/</span>
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              [(ngModel)]="editedOvertimeRate" 
+                              class="w-20 px-2 py-1 bg-white dark:bg-gray-800 border border-gray-250 dark:border-gray-700 rounded text-center text-xs font-bold focus:outline-none"
+                            />
+                            <span class="text-xs font-black text-gray-900 dark:text-white ml-2">
+                              S/ {{ (summ.totalOvertimeHours * editedOvertimeRate()) | number:'1.2-2' }}
+                            </span>
+                          </div>
+                        </div>
+
+                        <!-- Advances Line -->
+                        <div class="flex items-center justify-between text-xs border-b border-gray-100 dark:border-gray-800 pb-3">
+                          <div>
+                            <div class="font-bold text-gray-900 dark:text-white">Total Adelantos</div>
+                            <div class="text-[10px] text-gray-400">Monto adelantado al personal a la fecha</div>
+                          </div>
+                          <span class="font-bold text-rose-600">- S/ {{ summ.totalAdvances | number:'1.2-2' }}</span>
+                        </div>
+
+                        <!-- Deductions Line -->
+                        <div class="flex items-center justify-between text-xs pb-1">
+                          <div>
+                            <div class="font-bold text-gray-900 dark:text-white">Descuentos por Consumo</div>
+                            <div class="text-[10px] text-gray-400">Consumo interno a descontar del sueldo</div>
+                          </div>
+                          <span class="font-bold text-rose-600">- S/ {{ summ.totalDeductions | number:'1.2-2' }}</span>
+                        </div>
+
                       </div>
 
-                      <!-- Overtime Hours -->
-                      <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-150 dark:border-gray-800 flex flex-col justify-between">
-                        <span class="text-[10px] uppercase font-black tracking-wider text-gray-400">Horas Extra Acumuladas</span>
-                        <span class="text-lg font-black text-blue-600 mt-1">{{ summ.totalOvertimeHours | number:'1.1-2' }} hrs</span>
+                      <!-- Net Pending Card -->
+                      <div class="p-5 bg-blue-500/10 rounded-xl border border-blue-500/20 flex items-center justify-between mt-4">
+                        <div>
+                          <span class="text-[10px] uppercase font-black tracking-wider text-blue-600 dark:text-blue-400">Neto Calculado a Pagar</span>
+                          <p class="text-xs text-gray-400 mt-0.5">Recalculado al instante según las modificaciones de tarifas.</p>
+                        </div>
+                        <span class="text-2xl font-black text-blue-600 dark:text-blue-400">
+                          S/ {{ calculatedNetPending() | number:'1.2-2' }}
+                        </span>
                       </div>
 
-                      <!-- Advances -->
-                      <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-150 dark:border-gray-800 flex flex-col justify-between">
-                        <span class="text-[10px] uppercase font-black tracking-wider text-gray-400">Total Adelantos</span>
-                        <span class="text-lg font-black text-rose-600 mt-1">- S/ {{ summ.totalAdvances | number:'1.2-2' }}</span>
-                      </div>
-
-                      <!-- Deductions -->
-                      <div class="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-150 dark:border-gray-800 flex flex-col justify-between">
-                        <span class="text-[10px] uppercase font-black tracking-wider text-gray-400">Descuentos por Consumo</span>
-                        <span class="text-lg font-black text-rose-600 mt-1">- S/ {{ summ.totalDeductions | number:'1.2-2' }}</span>
-                      </div>
-                    </div>
-
-                    <!-- Net Pending Card -->
-                    <div class="p-5 bg-blue-500/10 rounded-xl border border-blue-500/20 flex items-center justify-between mt-6">
-                      <div>
-                        <span class="text-[10px] uppercase font-black tracking-wider text-blue-600 dark:text-blue-400">Neto Pendiente de Pago</span>
-                        <p class="text-xs text-gray-400 mt-0.5">Calculado automáticamente por el servidor con horas extra y descuentos aplicados.</p>
-                      </div>
-                      <span class="text-2xl font-black text-blue-600 dark:text-blue-400">
-                        S/ {{ summ.netPending | number:'1.2-2' }}
-                      </span>
                     </div>
                   } @else {
                     <div class="py-8 text-center text-gray-400 italic">
@@ -511,12 +592,15 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
             <option value="DAILY">Diario</option>
             <option value="BIWEEKLY">Quincenal</option>
             <option value="MONTHLY">Mensual</option>
+            <option value="HOURLY">Por Hora</option>
           </select>
         </div>
 
         <!-- Agreed Amount -->
         <div>
-          <label class="block text-xs font-black uppercase text-gray-400 mb-1">Sueldo / Monto Acordado (S/)</label>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">
+            {{ profileForm.paymentType === 'HOURLY' ? 'Pago por Hora Regular (S/)' : 'Sueldo / Monto Acordado (S/)' }}
+          </label>
           <input 
             type="number" 
             step="0.01" 
@@ -525,6 +609,32 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
             [(ngModel)]="profileForm.agreedAmount"
             name="profAmount"
             placeholder="0.00"
+            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- Overtime Hourly Rate -->
+        <div>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">Tarifa de Hora Extra (S/)</label>
+          <input 
+            type="number" 
+            step="0.01" 
+            min="0.00"
+            [(ngModel)]="profileForm.overtimeHourlyRate"
+            name="profOvertimeRate"
+            placeholder="Dejar vacío para usar tarifa base"
+            class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <!-- Fingerprint ID -->
+        <div>
+          <label class="block text-xs font-black uppercase text-gray-400 mb-1">ID de Huella (ZKTeco)</label>
+          <input 
+            type="number" 
+            [(ngModel)]="profileForm.fingerprintId"
+            name="profFingerprintId"
+            placeholder="No asignado"
             class="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -777,12 +887,165 @@ import { ModalShellComponent } from '../../../../shared/ui/modal/modal-shell.com
         </div>
       </form>
     </app-modal-shell>
+
+    <!-- ================= FINGERPRINT CONFIGURATION MODAL ================= -->
+    <app-modal-shell
+      [open]="isFingerprintModalOpen()"
+      (close)="closeFingerprintModal()"
+      title="Configuración de Asistencia con Huella Dactilar (ZKTeco)"
+      size="xl"
+    >
+      <div class="space-y-6">
+        
+        <!-- Connected Device Status Card -->
+        <div class="bg-gray-50 dark:bg-gray-900 p-5 rounded-2xl border border-gray-150 dark:border-gray-800 space-y-3">
+          <h4 class="text-xs font-black uppercase text-gray-400">Estado del Huellero Activo</h4>
+          
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              @if (fingerprintStatus(); as status) {
+                @if (status.activeSerialNumber) {
+                  <div class="font-extrabold text-sm text-gray-900 dark:text-white">
+                    Dispositivo: {{ status.activeSerialNumber }}
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    Última Sincronización: {{ status.lastSync ? (status.lastSync | date:'dd/MM/yyyy HH:mm:ss') : 'Nunca' }}
+                  </div>
+                } @else {
+                  <div class="font-bold text-xs text-gray-500 italic">
+                    Ningún huellero vinculado a esta estación de trabajo.
+                  </div>
+                }
+              } @else {
+                <div class="text-xs text-gray-400 font-bold">Verificando...</div>
+              }
+            </div>
+
+            <div>
+              @if (fingerprintStatus(); as status) {
+                @if (status.status === 'connected') {
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400 text-[10px] font-black uppercase">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    CONECTADO
+                  </span>
+                } @else if (status.activeSerialNumber) {
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400 text-[10px] font-black uppercase">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                    DESCONECTADO
+                  </span>
+                }
+              }
+            </div>
+          </div>
+
+          <!-- Unlink Button -->
+          @if (fingerprintStatus()?.activeSerialNumber) {
+            <div class="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+              <button 
+                (click)="unlinkFingerprintDevice()"
+                [disabled]="isSavingFingerprintConfig()"
+                class="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 font-bold text-[10px] rounded-lg border-none cursor-pointer uppercase tracking-wider transition-colors disabled:opacity-50 hover:text-red-700 dark:hover:text-red-300"
+              >
+                {{ isSavingFingerprintConfig() ? 'Desvinculando...' : 'Desvincular Dispositivo' }}
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Detection Scanner -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-black uppercase text-gray-400">Detectar Dispositivos en Red</h4>
+            <button
+              (click)="detectFingerprintDevices()"
+              [disabled]="isDetectingFingerprint()"
+              class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg border-none cursor-pointer uppercase tracking-wider flex items-center gap-1 shadow-sm transition-all"
+            >
+              <span>{{ isDetectingFingerprint() ? 'Buscando...' : '🔍 Buscar Huelleros' }}</span>
+            </button>
+          </div>
+
+          <!-- Scanning state -->
+          @if (isDetectingFingerprint()) {
+            <div class="py-8 flex flex-col items-center justify-center gap-3">
+              <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <span class="text-xs font-bold text-gray-500 animate-pulse">Escaneando red local (UDP Broadcast + TCP 4370)...</span>
+            </div>
+          } @else {
+            
+            <!-- Devices List -->
+            <div class="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              @for (dev of detectedFingerprintDevices(); track dev.sn) {
+                <div
+                  (click)="selectFingerprintDevice(dev)"
+                  class="p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-3 text-xs"
+                  [class.bg-blue-50/40]="selectedFingerprintDevice()?.sn === dev.sn"
+                  [class.border-blue-200]="selectedFingerprintDevice()?.sn === dev.sn"
+                  [class.dark:bg-blue-950/10]="selectedFingerprintDevice()?.sn === dev.sn"
+                  [class.dark:border-blue-900]="selectedFingerprintDevice()?.sn === dev.sn"
+                  [class.bg-white]="selectedFingerprintDevice()?.sn !== dev.sn"
+                  [class.border-gray-150]="selectedFingerprintDevice()?.sn !== dev.sn"
+                  [class.dark:bg-gray-800]="selectedFingerprintDevice()?.sn !== dev.sn"
+                  [class.dark:border-gray-800]="selectedFingerprintDevice()?.sn !== dev.sn"
+                >
+                  <div class="space-y-0.5">
+                    <div class="font-extrabold text-sm text-gray-900 dark:text-white">
+                      {{ dev.name }}
+                    </div>
+                    <div class="text-[10px] text-gray-400 font-bold font-mono">
+                      IP: {{ dev.ip }} • SN: {{ dev.sn }}
+                    </div>
+                  </div>
+
+                  <div>
+                    @if (selectedFingerprintDevice()?.sn === dev.sn) {
+                      <span class="text-blue-600 dark:text-blue-400 text-base">✓</span>
+                    }
+                  </div>
+                </div>
+              }
+              
+              @if (detectedFingerprintDevices().length === 0) {
+                <div class="py-6 text-center text-xs text-gray-400 italic bg-gray-50/30 dark:bg-gray-900/30 rounded-xl border border-dashed border-gray-250 dark:border-gray-850">
+                  Ningún huellero detectado. Presiona "Buscar Huelleros" para iniciar el escaneo.
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Action Footer -->
+        <div class="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <button 
+            type="button" 
+            (click)="closeFingerprintModal()"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+          >
+            Cerrar
+          </button>
+          <button 
+            type="button"
+            (click)="linkFingerprintDevice()"
+            [disabled]="!selectedFingerprintDevice() || isSavingFingerprintConfig()"
+            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs uppercase tracking-wider transition-all"
+          >
+            {{ isSavingFingerprintConfig() ? 'Vinculando...' : 'Vincular Huellero' }}
+          </button>
+        </div>
+
+      </div>
+    </app-modal-shell>
   `
 })
-export class StaffPageComponent implements OnInit {
+export class StaffPageComponent implements OnInit, OnDestroy {
   private api = inject(StaffApi);
   private notify = inject(NotificationService);
   private permissionService = inject(PermissionService);
+  private printAgent = inject(PrintAgentService);
+  private sessionService = inject(SessionService);
+  private realtime = inject(RealtimeService);
+
+  private alertsSub?: Subscription;
 
   private getLocalDateString(d: Date = new Date()): string {
     const tzoffset = d.getTimezoneOffset() * 60000;
@@ -809,6 +1072,29 @@ export class StaffPageComponent implements OnInit {
   public sanctions = signal<Sanction[]>([]);
   public overtime = signal<OvertimeRecord[]>([]);
   public summary = signal<PaymentSummary | null>(null);
+
+  // Inline editing signals for rates
+  public editedAgreedAmount = signal<number>(0);
+  public editedOvertimeRate = signal<number>(0);
+
+  public calculatedNetPending = computed(() => {
+    const summ = this.summary();
+    const prof = this.selectedProfile();
+    if (!summ || !prof) return 0;
+
+    const base = this.editedAgreedAmount();
+    const otRate = this.editedOvertimeRate();
+    const advances = summ.totalAdvances;
+    const deductions = summ.totalDeductions;
+    const otHours = summ.totalOvertimeHours;
+
+    if (prof.paymentType === 'HOURLY') {
+      const regHours = summ.regularHours || 0;
+      return regHours * base + otHours * otRate - advances - deductions;
+    } else {
+      return base + otHours * otRate - advances - deductions;
+    }
+  });
 
   // Selector for accounts without profile
   public availableAccounts = computed(() => {
@@ -837,9 +1123,16 @@ export class StaffPageComponent implements OnInit {
   public isAdjustmentModalOpen = signal<boolean>(false);
   public isSanctionModalOpen = signal<boolean>(false);
   public isOvertimeModalOpen = signal<boolean>(false);
+  public isFingerprintModalOpen = signal<boolean>(false);
+
+  public isDetectingFingerprint = signal<boolean>(false);
+  public detectedFingerprintDevices = signal<any[]>([]);
+  public fingerprintStatus = signal<any>(null);
+  public isSavingFingerprintConfig = signal<boolean>(false);
+  public selectedFingerprintDevice = signal<any>(null);
 
   // Forms Inputs
-  public profileForm = { id: 0, accountId: null as number | null, paymentType: 'MONTHLY' as 'DAILY' | 'BIWEEKLY' | 'MONTHLY', agreedAmount: 0 };
+  public profileForm = { id: 0, accountId: null as number | null, paymentType: 'MONTHLY' as 'DAILY' | 'BIWEEKLY' | 'MONTHLY' | 'HOURLY', agreedAmount: 0, overtimeHourlyRate: null as number | null, fingerprintId: null as number | null };
   public attendanceDateTimeInput = '';
   public adjustmentForm = { type: 'ADVANCE', amount: 0, date: '' };
   public sanctionForm = { type: 'UNJUSTIFIED_ABSENCE', reason: '', date: '' };
@@ -847,6 +1140,28 @@ export class StaffPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAll();
+
+    const restaurantId = this.sessionService.getRestaurantId();
+    if (restaurantId) {
+      this.alertsSub = this.realtime.subscribeToAlerts(restaurantId).subscribe({
+        next: (event) => {
+          if (event && event.eventType === 'AttendanceRecorded') {
+            console.log('[Realtime Staff] AttendanceRecorded event received, refreshing data...');
+            this.loadAll();
+            const selected = this.selectedProfile();
+            if (selected && selected.id === event.payload.staffProfileId) {
+              this.loadProfileDetails(selected.id);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.alertsSub) {
+      this.alertsSub.unsubscribe();
+    }
   }
 
   loadAll(): void {
@@ -930,7 +1245,11 @@ export class StaffPageComponent implements OnInit {
 
     // 5. Fetch payment summary
     this.api.getPaymentSummary(profileId).subscribe({
-      next: (data) => this.summary.set(data),
+      next: (data) => {
+        this.summary.set(data);
+        this.editedAgreedAmount.set(data.agreedAmount || 0);
+        this.editedOvertimeRate.set(data.overtimeHourlyRate || 0);
+      },
       error: () => this.notify.error('Error al cargar el resumen de pagos.')
     });
   }
@@ -938,13 +1257,13 @@ export class StaffPageComponent implements OnInit {
   // --- STAFF PROFILE CRUD ---
   openCreateProfileModal(): void {
     this.profileModalEditMode.set(false);
-    this.profileForm = { id: 0, accountId: null, paymentType: 'MONTHLY', agreedAmount: 0 };
+    this.profileForm = { id: 0, accountId: null, paymentType: 'MONTHLY', agreedAmount: 0, overtimeHourlyRate: null, fingerprintId: null as number | null };
     this.isProfileModalOpen.set(true);
   }
 
   openEditProfileModal(prof: StaffProfile): void {
     this.profileModalEditMode.set(true);
-    this.profileForm = { id: prof.id, accountId: prof.accountId, paymentType: prof.paymentType, agreedAmount: prof.agreedAmount };
+    this.profileForm = { id: prof.id, accountId: prof.accountId, paymentType: prof.paymentType, agreedAmount: prof.agreedAmount, overtimeHourlyRate: prof.overtimeHourlyRate || null, fingerprintId: prof.fingerprintId || null };
     this.isProfileModalOpen.set(true);
   }
 
@@ -953,14 +1272,17 @@ export class StaffPageComponent implements OnInit {
   }
 
   saveProfile(): void {
-    const { id, accountId, paymentType, agreedAmount } = this.profileForm;
+    const { id, accountId, paymentType, agreedAmount, overtimeHourlyRate, fingerprintId } = this.profileForm;
     if (agreedAmount <= 0) {
       this.notify.error('Ingresa un sueldo acordado válido mayor a cero.');
       return;
     }
 
+    const fId = fingerprintId ? Number(fingerprintId) : undefined;
+    const otRate = overtimeHourlyRate !== null && overtimeHourlyRate !== undefined ? Number(overtimeHourlyRate) : undefined;
+
     if (this.profileModalEditMode()) {
-      this.api.updateProfile(id, { accountId: accountId!, paymentType, agreedAmount }).subscribe({
+      this.api.updateProfile(id, { accountId: accountId!, paymentType, agreedAmount, overtimeHourlyRate: otRate, fingerprintId: fId }).subscribe({
         next: (res) => {
           this.notify.success('Contrato de pago actualizado.');
           this.closeProfileModal();
@@ -978,7 +1300,7 @@ export class StaffPageComponent implements OnInit {
         this.notify.error('Selecciona una cuenta de usuario.');
         return;
       }
-      this.api.createProfile({ accountId, paymentType, agreedAmount }).subscribe({
+      this.api.createProfile({ accountId, paymentType, agreedAmount, overtimeHourlyRate: otRate, fingerprintId: fId }).subscribe({
         next: (res) => {
           this.notify.success('Perfil de personal creado con éxito.');
           this.closeProfileModal();
@@ -988,6 +1310,134 @@ export class StaffPageComponent implements OnInit {
         error: () => this.notify.error('Error al registrar el perfil del colaborador.')
       });
     }
+  }
+
+  saveRates(): void {
+    const prof = this.selectedProfile();
+    if (!prof) return;
+
+    const base = this.editedAgreedAmount();
+    const otRate = this.editedOvertimeRate();
+
+    if (base <= 0) {
+      this.notify.error('La tarifa base regular debe ser mayor a cero.');
+      return;
+    }
+    if (otRate < 0) {
+      this.notify.error('La tarifa de hora extra no puede ser negativa.');
+      return;
+    }
+
+    this.api.updateProfile(prof.id, {
+      accountId: prof.accountId,
+      paymentType: prof.paymentType,
+      agreedAmount: base,
+      overtimeHourlyRate: otRate,
+      fingerprintId: prof.fingerprintId
+    }).subscribe({
+      next: (updatedProfile) => {
+        this.selectedProfile.set(updatedProfile);
+        this.notify.success('Tarifas actualizadas correctamente.');
+        this.loadProfileDetails(prof.id);
+      },
+      error: () => {
+        this.notify.error('No se pudieron guardar las tarifas.');
+      }
+    });
+  }
+
+  // --- ZKTECO FINGERPRINT CONFIGURATION ---
+  openFingerprintSettingsModal(): void {
+    this.isFingerprintModalOpen.set(true);
+    this.detectedFingerprintDevices.set([]);
+    this.selectedFingerprintDevice.set(null);
+    this.loadFingerprintStatus();
+  }
+
+  loadFingerprintStatus(): void {
+    this.printAgent.getFingerprintStatus().subscribe({
+      next: (status) => {
+        this.fingerprintStatus.set(status);
+      },
+      error: () => {
+        this.fingerprintStatus.set({ status: 'disconnected', activeSerialNumber: null, lastSync: null });
+      }
+    });
+  }
+
+  detectFingerprintDevices(): void {
+    this.isDetectingFingerprint.set(true);
+    this.printAgent.getFingerprintDevices().subscribe({
+      next: (devices) => {
+        this.detectedFingerprintDevices.set(devices);
+        this.isDetectingFingerprint.set(false);
+        if (devices.length === 0) {
+          this.notify.info('No se detectaron huelleros ZKTeco en la red local.');
+        } else {
+          this.notify.success(`Se encontraron ${devices.length} huellero(s) en la red.`);
+        }
+      },
+      error: () => {
+        this.isDetectingFingerprint.set(false);
+        this.notify.error('No se pudo establecer comunicación con el Agente local de impresión para detectar huelleros.');
+      }
+    });
+  }
+
+  selectFingerprintDevice(device: any): void {
+    this.selectedFingerprintDevice.set(device);
+  }
+
+  linkFingerprintDevice(): void {
+    const dev = this.selectedFingerprintDevice();
+    if (!dev) {
+      this.notify.error('Selecciona un dispositivo de la lista para vincular.');
+      return;
+    }
+
+    this.isSavingFingerprintConfig.set(true);
+    const token = this.sessionService.getToken() || '';
+    const backendUrl = environment.serverBaseUrl;
+
+    this.printAgent.saveFingerprintConfig({
+      activeSerialNumber: dev.sn,
+      backendUrl: backendUrl,
+      token: token
+    }).subscribe({
+      next: () => {
+        this.notify.success(`Huellero con SN ${dev.sn} vinculado exitosamente.`);
+        this.isSavingFingerprintConfig.set(false);
+        this.loadFingerprintStatus();
+        this.isFingerprintModalOpen.set(false);
+      },
+      error: () => {
+        this.isSavingFingerprintConfig.set(false);
+        this.notify.error('No se pudo guardar la vinculación del huellero en el agente local.');
+      }
+    });
+  }
+
+  unlinkFingerprintDevice(): void {
+    this.isSavingFingerprintConfig.set(true);
+    this.printAgent.saveFingerprintConfig({
+      activeSerialNumber: '',
+      backendUrl: '',
+      token: ''
+    }).subscribe({
+      next: () => {
+        this.notify.success('Huellero desvinculado con éxito.');
+        this.isSavingFingerprintConfig.set(false);
+        this.loadFingerprintStatus();
+      },
+      error: () => {
+        this.isSavingFingerprintConfig.set(false);
+        this.notify.error('Error al desvincular el huellero en el agente local.');
+      }
+    });
+  }
+
+  closeFingerprintModal(): void {
+    this.isFingerprintModalOpen.set(false);
   }
 
   toggleFingerprintConsent(prof: StaffProfile, event: Event): void {

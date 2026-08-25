@@ -315,7 +315,7 @@ export class KitchenPageComponent implements OnInit, OnDestroy {
       
       sorted.forEach(item => {
         const itemTime = new Date(item.createdAt).getTime();
-        if (prevTime === null || (itemTime - prevTime) <= 5000) {
+        if (prevTime === null || (itemTime - prevTime) <= 3000) {
           currentRound.push(item);
         } else {
           if (currentRound.length > 0) {

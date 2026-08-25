@@ -9,6 +9,9 @@ export interface CustomerResource {
   email?: string;
   birthday?: string;
   address?: string;
+  documentNumber?: string;
+  lastPaymentMethod?: string;
+  affiliated?: boolean;
   dataConsentAccepted: boolean;
   dataConsentDate?: string;
   pointsBalance: number;

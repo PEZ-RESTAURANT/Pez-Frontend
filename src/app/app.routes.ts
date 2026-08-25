@@ -99,6 +99,12 @@ export const routes: Routes = [
         data: { permission: PERMISSIONS.STAFF.VIEW }
       },
       {
+        path: 'staff/attendance/unresolved',
+        loadComponent: () => import('./features/staff/presentation/pages/unresolved-attendance-page.component').then(m => m.UnresolvedAttendancePageComponent),
+        canActivate: [permissionGuard],
+        data: { permission: PERMISSIONS.STAFF.VIEW }
+      },
+      {
         path: 'catalog',
         loadComponent: () => import('./features/catalog/presentation/pages/catalog-page.component').then(m => m.CatalogPageComponent),
         canActivate: [permissionGuard],

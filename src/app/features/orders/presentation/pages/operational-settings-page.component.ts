@@ -136,6 +136,24 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
               </p>
             </div>
           </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Alerta de Asistencias sin Salida *</label>
+              <select appSelect
+                required
+                [(ngModel)]="config.unresolvedAttendanceNotificationPref"
+                class="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl font-bold text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="BOTH">Administrador y Cajero (Ambos)</option>
+                <option value="ADMIN">Solo Administrador</option>
+                <option value="CASHIER">Solo Cajero</option>
+              </select>
+              <p class="text-[10px] text-gray-400 mt-1.5 font-medium">
+                Define a qué roles del sistema se les mostrará la notificación visual toast al cierre de un turno cuando queden entradas sin salida.
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- ACCIONES -->

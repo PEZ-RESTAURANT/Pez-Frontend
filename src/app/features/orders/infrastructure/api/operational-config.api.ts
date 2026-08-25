@@ -9,6 +9,7 @@ export interface OperationalConfig {
   waitingDishesThresholdMinutes: number;
   annulmentNotificationPref?: string;
   dailySummaryTime?: string;
+  unresolvedAttendanceNotificationPref?: string;
 }
 
 @Injectable({ providedIn: 'root' })

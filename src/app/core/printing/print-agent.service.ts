@@ -58,6 +58,42 @@ export class PrintAgentService {
   }
 
   /**
+   * Obtiene la lista de dispositivos de huella dactilar ZKTeco detectados en la red.
+   */
+  getFingerprintDevices(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/fingerprint-devices`).pipe(
+      catchError(err => {
+        console.error('Error fetching fingerprint devices:', err);
+        return of([]);
+      })
+    );
+  }
+
+  /**
+   * Guarda la configuración del huellero activo en el agente local.
+   */
+  saveFingerprintConfig(payload: { activeSerialNumber: string, backendUrl: string, token: string }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/fingerprint-devices/config`, payload).pipe(
+      catchError(err => {
+        console.error('Error saving fingerprint config to agent:', err);
+        throw err;
+      })
+    );
+  }
+
+  /**
+   * Obtiene el estado de conexión del huellero activo desde el agente local.
+   */
+  getFingerprintStatus(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/fingerprint-devices/status`).pipe(
+      catchError(err => {
+        console.error('Error fetching fingerprint status from agent:', err);
+        return of({ status: 'disconnected', activeSerialNumber: null, lastSync: null });
+      })
+    );
+  }
+
+  /**
    * Configuración de la impresora seleccionada en el navegador local.
    */
   saveSelectedPrinter(name: string): void {

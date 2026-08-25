@@ -52,16 +52,20 @@ export interface OverridePayload {
 export interface StaffProfile {
   id: number;
   accountId: number;
-  paymentType: 'DAILY' | 'BIWEEKLY' | 'MONTHLY';
+  paymentType: 'DAILY' | 'BIWEEKLY' | 'MONTHLY' | 'HOURLY';
   agreedAmount: number;
+  overtimeHourlyRate?: number;
   fingerprintConsent: boolean;
   fingerprintConsentDate?: string;
+  fingerprintId?: number;
 }
 
 export interface CreateStaffProfilePayload {
   accountId: number;
-  paymentType: 'DAILY' | 'BIWEEKLY' | 'MONTHLY';
+  paymentType: 'DAILY' | 'BIWEEKLY' | 'MONTHLY' | 'HOURLY';
   agreedAmount: number;
+  overtimeHourlyRate?: number;
+  fingerprintId?: number;
 }
 
 export interface AttendanceRecord {
@@ -70,6 +74,7 @@ export interface AttendanceRecord {
   checkInAt?: string;
   checkOutAt?: string;
   method: 'FINGERPRINT_HASH' | 'MANUAL_BY_ADMIN';
+  isUnresolved: boolean;
 }
 
 export interface PayrollAdjustment {
@@ -104,6 +109,11 @@ export interface PaymentSummary {
   totalAdvances: number;
   totalDeductions: number;
   totalOvertimeHours: number;
+  regularHourlyRate: number;
+  regularHours: number;
+  overtimeHourlyRate: number;
+  basePay: number;
+  overtimePay: number;
   netPending: number;
 }
 
@@ -167,6 +177,14 @@ export class StaffApi extends BaseApiService {
 
   checkOut(payload: { staffProfileId: number, checkOutAt?: string }): Observable<AttendanceRecord> {
     return this.http.post<AttendanceRecord>(`${this.baseUrl}/staff/attendance/check-out`, payload);
+  }
+
+  getUnresolvedAttendance(): Observable<AttendanceRecord[]> {
+    return this.http.get<AttendanceRecord[]>(`${this.baseUrl}/staff/attendance/unresolved`);
+  }
+
+  resolveAttendance(id: number, payload: { checkOutAt: string }): Observable<AttendanceRecord> {
+    return this.http.put<AttendanceRecord>(`${this.baseUrl}/staff/attendance/${id}/resolve`, payload);
   }
 
   // --- PAYROLL ADJUSTMENTS MAPPINGS ---

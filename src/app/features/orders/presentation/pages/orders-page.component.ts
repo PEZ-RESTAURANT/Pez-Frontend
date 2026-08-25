@@ -173,7 +173,8 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
               [ngClass]="getStatusClasses(table)"
               [style.left.px]="table.positionX"
               [style.top.px]="table.positionY"
-              class="absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-between p-3.5 cursor-pointer shadow-md transition-all duration-300 transform hover:scale-[1.03]"
+              class="group absolute w-24 h-24 rounded-2xl flex flex-col items-center justify-between p-3.5 shadow-md transition-all duration-300 transform hover:scale-[1.03]"
+              style="cursor: pointer !important;"
             >
               <!-- Indicador de platos READY (Listo para entregar) -->
               @if (hasReadyItems(table.id)) {
@@ -184,7 +185,7 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
               
               <!-- Icono superior/fusión/bloqueo -->
               <div class="w-full flex items-center justify-between">
-                <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider text-gray-750 dark:text-gray-200">
+                <span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/10 uppercase tracking-wider text-gray-750 dark:text-gray-200 group-hover:text-white group-hover:bg-white/20">
                   M{{ table.number }}
                 </span>
                 
@@ -199,7 +200,7 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
                   }
 
                   <!-- Icono de anclaje de fusión -->
-                  <span *ngIf="table.anchorTableId" class="text-purple-650 dark:text-purple-400" title="Mesa fusionada">
+                  <span *ngIf="table.anchorTableId" class="text-purple-650 dark:text-purple-400 group-hover:text-white" title="Mesa fusionada">
                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                     </svg>
@@ -209,8 +210,8 @@ import { SelectDirective } from '../../../../shared/ui/select/select.directive';
 
               <!-- Numero de Mesa Central / Zona -->
               <div class="text-center">
-                <span class="text-xs font-black text-gray-900 dark:text-white leading-none block">M{{ table.number }}</span>
-                <span class="text-[9px] text-gray-400 font-bold block mt-1 uppercase">{{ table.zoneTag || 'Salón' }}</span>
+                <span class="text-xs font-black text-gray-900 dark:text-white leading-none block group-hover:text-white">M{{ table.number }}</span>
+                <span class="text-[9px] text-gray-400 font-bold block mt-1 uppercase group-hover:text-white/80">{{ table.zoneTag || 'Salón' }}</span>
                 @if (table.anchorTableId) {
                   <span class="text-[8px] bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-black px-1.5 py-0.5 rounded-sm block mt-1.5 whitespace-nowrap">
                     Unida a M{{ getAnchorTableNumber(table.anchorTableId) }}
@@ -795,13 +796,13 @@ export class OrdersPageComponent implements OnInit {
     const isLocked = this.isTableLocked(table.id);
     const status = table.status;
     return {
-      'bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-500 text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-500': status === 'FREE' && !isLocked,
-      'bg-red-50 hover:bg-red-100 border-2 border-red-500 text-red-800 dark:bg-red-950/20 dark:border-red-500 animate-pulse': status === 'UNATTENDED',
-      'bg-sky-50 hover:bg-sky-100 border-2 border-sky-500 text-sky-800 dark:bg-sky-950/20 dark:border-sky-500': status === 'TAKING_ORDER',
-      'bg-purple-50 hover:bg-purple-100 border-2 border-purple-500 text-purple-800 dark:bg-purple-950/20 dark:border-purple-500': status === 'WAITING_DISHES',
-      'bg-orange-50 hover:bg-orange-100 border-2 border-orange-500 text-orange-800 dark:bg-orange-950/20 dark:border-orange-500': status === 'ALL_DELIVERED',
-      'bg-pink-50 hover:bg-pink-100 border-2 border-pink-500 text-pink-800 dark:bg-pink-950/20 dark:border-pink-500': status === 'ISSUED_UNPAID',
-      'bg-cyan-50 hover:bg-cyan-100 border-2 border-cyan-500 text-cyan-800 dark:bg-cyan-950/20 dark:border-cyan-500': status === 'PAID',
+      'bg-emerald-50 text-emerald-800 border-2 border-emerald-500 hover:bg-emerald-600 hover:border-emerald-600 hover:text-white dark:bg-emerald-950/20 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white': status === 'FREE' && !isLocked,
+      'bg-red-50 text-red-800 border-2 border-red-500 hover:bg-red-650 hover:border-red-650 hover:text-white dark:bg-red-950/20 dark:border-red-500 dark:text-red-300 dark:hover:bg-red-600 dark:hover:text-white animate-pulse': status === 'UNATTENDED',
+      'bg-sky-50 text-sky-800 border-2 border-sky-500 hover:bg-sky-600 hover:border-sky-600 hover:text-white dark:bg-sky-950/20 dark:border-sky-500 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white': status === 'TAKING_ORDER',
+      'bg-purple-50 text-purple-800 border-2 border-purple-500 hover:bg-purple-650 hover:border-purple-650 hover:text-white dark:bg-purple-950/20 dark:border-purple-500 dark:text-purple-300 dark:hover:bg-purple-650 dark:hover:text-white': status === 'WAITING_DISHES',
+      'bg-orange-50 text-orange-800 border-2 border-orange-500 hover:bg-orange-500 hover:border-orange-500 hover:text-white dark:bg-orange-950/20 dark:border-orange-500 dark:text-orange-300 dark:hover:bg-orange-600 dark:hover:text-white': status === 'ALL_DELIVERED',
+      'bg-pink-50 text-pink-800 border-2 border-pink-500 hover:bg-pink-600 hover:border-pink-600 hover:text-white dark:bg-pink-950/20 dark:border-pink-500 dark:text-pink-300 dark:hover:bg-pink-600 dark:hover:text-white': status === 'ISSUED_UNPAID',
+      'bg-cyan-50 text-cyan-800 border-2 border-cyan-500 hover:bg-cyan-600 hover:border-cyan-600 hover:text-white dark:bg-cyan-950/20 dark:border-cyan-500 dark:text-cyan-300 dark:hover:bg-cyan-600 dark:hover:text-white': status === 'PAID',
       // Estilo mesa bloqueada
       'border-red-650 opacity-90 ring-2 ring-red-400': isLocked
     };

@@ -1,8 +1,11 @@
-import { Component, inject, Output, EventEmitter } from '@angular/core';
+import { Component, inject, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { SessionService } from '../../core/auth/services/session.service';
 import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
+import { RealtimeService } from '../../core/realtime/services/realtime.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-topbar',
@@ -53,14 +56,56 @@ import { ThemeToggleComponent } from '../theme-toggle/theme-toggle.component';
     </header>
   `
 })
-export class TopbarComponent {
+export class TopbarComponent implements OnInit, OnDestroy {
   public sessionService = inject(SessionService);
   private router = inject(Router);
+  private realtime = inject(RealtimeService);
+  private notify = inject(NotificationService);
+
+  private alertsSub?: Subscription;
 
   @Output() toggleMobileMenu = new EventEmitter<void>();
+
+  ngOnInit(): void {
+    const restaurantId = this.sessionService.getRestaurantId();
+    if (restaurantId) {
+      this.alertsSub = this.realtime.subscribeToAlerts(restaurantId).subscribe({
+        next: (event) => {
+          if (event && event.eventType === 'AttendanceRecorded') {
+            const checkType = event.payload.checkIn ? 'ENTRADA' : 'SALIDA';
+            this.notify.success(`Asistencia: ¡Huella confirmada! Registró marcaje de ${checkType}.`);
+          } else if (event && event.eventType === 'UnmappedFingerprintEventOccurred') {
+            this.notify.warning(`Huella no reconocida — ID ${event.payload.deviceUserId} marcó asistencia, vincúlala a un trabajador.`);
+          } else if (event && event.eventType === 'UnresolvedAttendanceDetected') {
+            const currentUser = this.sessionService.currentUser$();
+            if (currentUser && currentUser.roles) {
+              const notifiedRoles: string[] = event.payload.notifiedRoles || [];
+              const matches = currentUser.roles.some((r: string) => notifiedRoles.includes(r.toUpperCase()));
+              if (matches) {
+                this.notify.warning(
+                  'Se detectaron asistencias sin salida al cerrar turno. Haz clic aquí para resolverlas.',
+                  '/app/staff/attendance/unresolved',
+                  'Resolver'
+                );
+              }
+            }
+          }
+        },
+        error: (err) => {
+          console.error('Error on global alerts WebSocket subscription:', err);
+        }
+      });
+    }
+  }
 
   logout(): void {
     this.sessionService.clearSession();
     window.location.href = '/auth/login';
+  }
+
+  ngOnDestroy(): void {
+    if (this.alertsSub) {
+      this.alertsSub.unsubscribe();
+    }
   }
 }

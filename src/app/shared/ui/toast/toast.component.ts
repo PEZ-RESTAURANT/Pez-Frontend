@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
@@ -25,7 +26,7 @@ import { NotificationService } from '../../../core/services/notification.service
           [class.border-amber-200]="toast.type === 'warning'"
           role="alert"
         >
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-1">
             @if (toast.type === 'success') {
               <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -43,13 +44,24 @@ import { NotificationService } from '../../../core/services/notification.service
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             }
-            <span class="text-sm font-medium">{{ toast.message }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-medium">{{ toast.message }}</span>
+              @if (toast.actionRoute) {
+                <button
+                  type="button"
+                  (click)="navigate(toast.actionRoute, toast.id)"
+                  class="self-start text-xs font-bold underline text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-1 cursor-pointer bg-transparent border-none p-0 focus:outline-none"
+                >
+                  {{ toast.actionLabel || 'Resolver aquí' }}
+                </button>
+              }
+            </div>
           </div>
 
           <button
             type="button"
             (click)="notificationService.dismiss(toast.id)"
-            class="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded cursor-pointer"
+            class="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded cursor-pointer self-start"
           >
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -63,4 +75,10 @@ import { NotificationService } from '../../../core/services/notification.service
 })
 export class ToastContainerComponent {
   public notificationService = inject(NotificationService);
+  private router = inject(Router);
+
+  navigate(route: string, id: number): void {
+    this.router.navigate([route]);
+    this.notificationService.dismiss(id);
+  }
 }

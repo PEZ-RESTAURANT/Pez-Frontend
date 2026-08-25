@@ -976,6 +976,12 @@ export class OrderDetailPageComponent implements OnInit, OnDestroy {
       next: (cust) => {
         this.loyaltyCustomer.set(cust);
         this.deliveryCustomerName = cust.fullName;
+        if (cust.address) {
+          this.deliveryAddress = cust.address;
+        }
+        if (cust.lastPaymentMethod) {
+          this.declaredPaymentMethod = cust.lastPaymentMethod;
+        }
         this.notify.success(`Cliente ${cust.fullName} vinculado.`);
       },
       error: () => {
